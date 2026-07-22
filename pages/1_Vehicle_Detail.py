@@ -12,7 +12,9 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+from pricing_agent.agents import extract, intent_of
 from pricing_agent.config import load_config
+from pricing_agent.llm import credentials_present, explain
 from pricing_agent.mcp_clients import MockTransport, VautoClient
 from pricing_agent.policy.price_floor import can_publish
 from pricing_agent.skills.single_vehicle import analyze
@@ -80,6 +82,51 @@ st.caption(
     f"{vehicle['days_in_inventory']} days in inventory · {vehicle['condition'].title()}"
 )
 
+# --- natural-language intake (§4.2) ---------------------------------------------------
+
+with st.expander("Ask in plain English", expanded=False):
+    st.caption(
+        "The model reads the request into validated JSON and hands it to the engine. It "
+        "never produces a number — the extraction schema has no property for one."
+    )
+    question = st.text_area(
+        "Request",
+        value=(
+            "Analyze this 2022 Toyota RAV4 XLE with 42,000 miles. We paid $23,500 and "
+            "spent $1,200 on reconditioning. It has been in inventory for 37 days. Tell "
+            "me what it is worth, how much discount room we have, and the expected P50 "
+            "and P90 sales time."
+        ),
+        height=110,
+        label_visibility="collapsed",
+    )
+    if st.button("Extract"):
+        request, llm_result, errors = extract(question, as_of=AS_OF)
+        badge = "🟢 live model" if llm_result.live else "🟡 recorded fallback"
+        st.caption(f"{badge} · routed to `{intent_of(llm_result)}`"
+                   + (f" · {llm_result.note}" if llm_result.note else ""))
+
+        if errors:
+            st.error(
+                "Extraction did not validate, so it was not passed to any tool (§4.2):\n\n"
+                + "\n".join(f"- {e}" for e in errors)
+            )
+        else:
+            st.success("Schema-valid — safe to pass to the pricing engine.", icon="✅")
+
+        left, right = st.columns(2)
+        left.markdown("**Extracted request**")
+        left.json({k: v for k, v in request.items() if k not in ("extraction_provenance",)})
+        right.markdown("**Field provenance**")
+        right.dataframe(
+            pd.DataFrame(request["extraction_provenance"]),
+            hide_index=True, use_container_width=True,
+        )
+        st.caption(
+            "Note what is absent: no price, no valuation, no days-to-sale. Those fields "
+            "do not exist in the extraction schema, which is the structural half of §4.1."
+        )
+
 # --- the refusal, before anything else ------------------------------------------------
 
 publishable, reasons = can_publish(result["warnings"], [])
@@ -121,6 +168,28 @@ st.caption(
     f"Strategy **{recommended_strategy.replace('_', ' ').title()}** · "
     + " · ".join(f"`{c}`" for c in result["recommended_strategy"]["rationale_codes"])
 )
+
+# --- narration, constrained to the allow-list -----------------------------------------
+
+narrative = explain(result["explanation_inputs"], result["warnings"])
+with st.container(border=True):
+    st.markdown(md(narrative.text))
+    caption = f"Explanation source: **{narrative.source_label}**"
+    if not credentials_present():
+        caption += " — no API key set, so the deterministic template is used."
+    st.caption(caption)
+
+    if narrative.rejected:
+        # The model cited something the engine never published, so its prose was
+        # discarded. Showing that this happened is more valuable than hiding it.
+        st.warning(
+            md(
+                "The generated explanation was **rejected** and replaced with the "
+                "template. It cited figures the engine never produced: "
+                + ", ".join(narrative.rejected)
+            ),
+            icon="🛡️",
+        )
 
 # --- warnings -------------------------------------------------------------------------
 

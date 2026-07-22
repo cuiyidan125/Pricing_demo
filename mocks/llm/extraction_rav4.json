@@ -1,0 +1,35 @@
+{
+  "intent": "SINGLE_VEHICLE",
+  "vehicle": {
+    "vehicle_id": null,
+    "year": 2022,
+    "make": "Toyota",
+    "model": "RAV4",
+    "trim": "XLE",
+    "mileage": 42000,
+    "condition": null
+  },
+  "dealer_context": {
+    "acquisition_cost": 23500,
+    "reconditioning_cost": 1200,
+    "transportation_cost": null,
+    "current_list_price": null,
+    "days_in_inventory": 37
+  },
+  "requested_outputs": ["VALUATION", "PROMOTIONAL_HEADROOM", "SALES_FORECAST"],
+  "extraction_provenance": [
+    { "field": "year", "source": "USER_STATED", "note": null },
+    { "field": "make", "source": "USER_STATED", "note": null },
+    { "field": "model", "source": "USER_STATED", "note": null },
+    { "field": "trim", "source": "USER_STATED", "note": null },
+    { "field": "mileage", "source": "USER_STATED", "note": null },
+    { "field": "acquisition_cost", "source": "USER_STATED", "note": "stated as 'we paid $23,500'" },
+    { "field": "reconditioning_cost", "source": "USER_STATED", "note": "stated as 'spent $1,200 on reconditioning'" },
+    { "field": "days_in_inventory", "source": "USER_STATED", "note": null },
+    { "field": "condition", "source": "MISSING", "note": "not stated; will be read from inventory" },
+    { "field": "transportation_cost", "source": "MISSING", "note": "not stated; will be read from cost basis" },
+    { "field": "current_list_price", "source": "MISSING", "note": "not stated; will be read from inventory" }
+  ],
+  "ambiguities": [],
+  "_note": "Recorded fallback for the §13.2 request, used when no API credentials are present so a live demo cannot break. Note what is NOT here: no price, no valuation, no days-to-sale. The extraction schema has no property for those, which is the structural half of §4.1."
+}
