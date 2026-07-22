@@ -202,7 +202,7 @@ The MVP will support:
 * 30-day and 90-day sales forecast
 * promotion planning
 * warning and approval rules
-* Streamlit internal interface
+* Streamlit internal interface, organised by dealer workflow (§6.1)
 * audit-ready structured output
 
 ## 5.2 Out of scope for MVP
@@ -259,6 +259,54 @@ LLM Explanation
     ↓
 User Review and Approval
 ```
+
+## 6.1 Workflow layer
+
+*Added after the skill-first prototype was built. The layers above are unchanged; this
+names the layer between the user and the Skill Router.*
+
+The product is presented as the dealer's jobs, not as the tool's capabilities. Five terms,
+used consistently across the interface, the code, and this document:
+
+| Term | Definition | Count |
+| --- | --- | --- |
+| **Agent** | Reads a request in the user's own words and directs it. Orchestrates; never computes (§4.1). | 1 |
+| **Workflow** | A job the dealer has. Sequences skills and frames the result. What the navigation is made of. | 4 |
+| **Skill** | A reusable capability owning one analysis end to end (§10). Never a navigation entry. | 3 |
+| **MCP tool** | A typed adapter over a system of record (§8, §9). | — |
+| **Dashboard** | A view rendering a finished result. Never calculates. | — |
+
+The four workflows:
+
+| Workflow | Question it answers | Skills used |
+| --- | --- | --- |
+| **Acquire Inventory** | What can the lot absorb before buying more? Capacity, gaps, open slots, aging and replacement pressure. | portfolio forecast |
+| **Price Inventory** | What is this vehicle worth, what should it be listed at, and what floor constrains it? | single-vehicle valuation |
+| **Merchandise Inventory** | Which vehicles to discount for an event, by how much, and is the target reachable? | promotion planner |
+| **Improve Aging Inventory** | What should be done about the aged units? | all three |
+
+**Acquire Inventory does not evaluate an external acquisition candidate.** It answers what
+the lot can absorb, from the inventory the dealer already has. Appraising a specific
+prospective purchase would require a valuation of a vehicle not in inventory and an
+acquisition-cost source; neither is in MVP scope (§5.2).
+
+**Improve Aging Inventory is a workflow, not a fourth skill.** It coordinates the three
+existing skills against aged units and introduces no valuation, forecasting, or promotion
+arithmetic of its own. §28's prohibition on reimplementing a calculation is the reason: a
+fourth skill would have duplicated all three.
+
+Navigation is declared as data in one registry module rather than implied by filenames, so
+the vocabulary in this section and the vocabulary on screen cannot drift apart.
+
+### Implementation status
+
+Two capabilities in this section are specified but not yet built, and the interface says so
+on screen rather than implying otherwise:
+
+* **Natural-language routing from the assistant** (§7.1). The entry point captures a
+  question and states that routing is not connected. No model is called from it.
+* **Improve Aging orchestration.** The page describes its six-step sequence and which
+  capability serves each step. It runs none of them and produces no figures.
 
 ---
 

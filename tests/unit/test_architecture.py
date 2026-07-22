@@ -28,6 +28,7 @@ FORBIDDEN_PREFIXES = (
     "pricing_agent.llm",
     "pricing_agent.agents",
     "pricing_agent.skills",
+    "pricing_agent.views",        # presentation sits above the engine, never below it
     "pricing_agent.mcp_clients",  # §2 -- domain performs no I/O; skills pass data in
     "requests",
     "httpx",

@@ -39,8 +39,8 @@ pip install -e .
 streamlit run app.py           # http://localhost:8501
 ```
 
-Three pages: the **lot** (inventory, risk, 30/90-day forecast), **vehicle detail**
-(recommendation, strategies, floor, discount ladder, audit), and the **promotion planner**.
+The application opens on **Ask the Dealer AI Assistant** and is organised by the dealer's
+job, not by the tool's internals — see [How it is organised](#how-it-is-organised) below.
 
 An `ANTHROPIC_API_KEY` is optional. Without one, natural-language intake falls back to a
 recorded extraction and narration falls back to a deterministic template assembled from
@@ -50,11 +50,47 @@ use.
 ### Tests
 
 ```bash
-python -m pytest tests -q            # 85 tests
+python -m pytest tests -q            # 225 tests
 python scripts/validate_schemas.py   # 62 checks: schemas, refs, fixtures, scenarios
 ```
 
 `scripts/validate_structure.ps1` runs the subset that needs no Python.
+
+---
+
+## How it is organised
+
+Five words, used consistently:
+
+| Term | What it means here |
+| --- | --- |
+| **Agent** | The entry point that reads a request in the dealer's words. It orchestrates; it never computes. |
+| **Workflow** | A job a dealer actually has — *acquire*, *price*, *merchandise*, *improve aging*. This is what the navigation is made of. |
+| **Skill** | A reusable capability a workflow calls. There are three, and none of them is a menu item. |
+| **MCP tool** | A read adapter over a system of record (vAuto, DMS, dealer costs), plus one isolated write client. |
+| **Dashboard** | A view that renders a finished result. Views never calculate. |
+
+Navigation is declared as data in `src/pricing_agent/workflows/registry.py`, so the sidebar
+and the product's vocabulary cannot drift apart:
+
+```
+Dealer AI Assistant
+  Ask the Assistant            ← default entry point
+Dealer Workflows
+  Acquire Inventory            capacity, gaps, open slots, replacement pressure
+  Price Inventory              value one vehicle: market, gross vs turn, floor
+  Merchandise Inventory        plan a sale event: who to discount, and whether the target is reachable
+  Improve Aging Inventory      coordinates all three skills against aged units
+```
+
+Two things the shell does **not** yet do, and says so on screen:
+
+- **The assistant does not route natural language.** It captures the question, holds it in
+  session state, and tells you routing is not connected. No model is called from that box.
+- **Improve Aging Inventory does not orchestrate.** It describes the six-step sequence and
+  which capability serves each step. It runs none of them and fabricates no output.
+
+Both are the next phase of work. See `docs/workflow-navigation-results.md`.
 
 ---
 
@@ -74,6 +110,8 @@ src/pricing_agent/
     policy/       warnings, floors, approvals, freshness — runs last, adds only
     skills/       orchestration
     agents/, llm/ intake and explanation
+    workflows/    the dealer-workflow registry — one declaration of what the product offers
+    views/        Streamlit render functions, bound to a workflow by the registry
 tests/      unit, schema, integration, plus 37 scenario definitions
 ```
 

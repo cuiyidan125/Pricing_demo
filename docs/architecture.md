@@ -27,12 +27,15 @@ Three rules carry most of the weight:
 
 ```text
 ┌──────────────────────────────────────────────────────────────────────┐
-│ app/            Streamlit UI. Renders. Never calculates.             │
+│ app.py          Entry point. Builds navigation from the registry.    │
+│ src/workflows/  The dealer workflows, declared as data. Binds each   │
+│                 to a view. No Streamlit import, no arithmetic.       │
+│ src/views/      Streamlit render functions. Render. Never calculate. │
 ├──────────────────────────────────────────────────────────────────────┤
 │ src/agents/     Intent routing, entity extraction, clarification.    │
 │                 LLM lives here. Emits validated JSON only.           │
 ├──────────────────────────────────────────────────────────────────────┤
-│ src/skills/     Workflow orchestration. Sequences MCP calls and      │
+│ src/skills/     Skill orchestration. Sequences MCP calls and         │
 │                 domain calls. Assembles result objects.              │
 ├──────────────────────────────────────────────────────────────────────┤
 │ src/mcp_clients/   Typed adapters over MCP tools. Return DTOs with   │
@@ -51,15 +54,45 @@ Three rules carry most of the weight:
 ### Dependency rule
 
 ```text
-app → agents → skills → { mcp_clients, domain, simulation, policy }
+app.py → workflows → views → agents → skills → { mcp_clients, domain, simulation, policy }
 domain, simulation → config only
 llm → finished result objects only
 ```
 
 `domain/` and `simulation/` import nothing from `agents/`, `skills/`, `mcp_clients/`, `llm/`,
-or `app/`. They never perform I/O and never call an MCP tool. Skills fetch data and pass it
-in. This is what makes the calculation layer testable without mocks and reusable across all
-three skills, as §28 requires.
+`views/`, or `workflows/`. They never perform I/O and never call an MCP tool. Skills fetch
+data and pass it in. This is what makes the calculation layer testable without mocks and
+reusable across all three skills, as §28 requires.
+
+The `workflows → views` edge runs one way only. The registry imports views to bind a render
+callable; a view that imported the registry back would close a cycle, so the assistant home
+receives its workflow cards as an argument. `tests/unit/test_views.py` asserts this.
+
+---
+
+## 2.1 Agent, workflow, skill
+
+Three words that are easy to blur, kept distinct because the distinction is the product.
+
+| | Owns | Count | In the navigation? |
+| --- | --- | --- | --- |
+| **Agent** | Reading a request in the dealer's words and choosing where it goes | 1 | Yes — the default entry point |
+| **Workflow** | A job the dealer has. Sequences skills and frames the result | 4 | Yes — this is what the sidebar is made of |
+| **Skill** | A reusable capability. Owns one analysis end to end | 3 | **No** — always reached through a workflow |
+
+A workflow may use one skill or several; a skill may serve several workflows. **Improve
+Aging Inventory is a workflow, not a fourth skill** — it coordinates all three against aged
+units and adds no valuation, forecasting, or promotion arithmetic of its own. Making it a
+skill would have meant duplicating logic that already exists three times over.
+
+Navigation is declared in `src/pricing_agent/workflows/registry.py` as frozen dataclasses,
+so what the product offers is one list rather than a set of filenames. The registry holds no
+Streamlit import and no arithmetic; it binds a `WorkflowContext` into each view with
+`functools.partial`, which is what lets one view serve more than one workflow without being
+copied.
+
+Two capabilities the shell does not yet have, stated on screen rather than implied:
+natural-language routing from the assistant, and Improve Aging orchestration.
 
 ---
 
@@ -263,6 +296,9 @@ other fixtures permanently fresh.
 
 ```text
 src/
+├── workflows/         registry (the four dealer workflows + the assistant), WorkflowContext
+├── views/             dashboard, vehicle_detail, promotion, assistant_home,
+│                      improve_aging, page_config — render only
 ├── agents/            intent routing, extraction, clarification, narration guard
 ├── skills/            one module per skill; orchestration only
 ├── mcp_clients/       vauto_client, cost_client, capacity_client, event_client
@@ -278,3 +314,8 @@ Two additions to the §25 tree: `domain/summarize.py`, which owns percentile pro
 `simulation_id` stamp cannot be bypassed, and `mcp_clients/write_client.py`, which enforces
 §8. Comparable selection lives inside `domain/valuation.py` rather than in a separate module,
 to stay closer to the specified tree.
+
+`workflows/` and `views/` replaced the earlier Streamlit `pages/` directory. Filename-ordered
+pages could not express that Improve Aging Inventory is a workflow over three skills, and
+they made the navigation a property of the filesystem rather than a declaration.
+`docs/workflow-navigation-results.md` records that migration.

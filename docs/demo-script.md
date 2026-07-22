@@ -1,17 +1,34 @@
 # Demo Script
 
-Five beats, about five minutes. Written for a used-vehicle manager or general manager —
+Six beats, about five minutes. Written for a used-vehicle manager or general manager —
 lead with dollars and days, not architecture.
 
 **Before you start:** `streamlit run app.py`, open http://localhost:8501, and click
 through once so Streamlit's caches are warm. A cold first load runs the whole lot and
 takes a few seconds.
 
+The sidebar is organised by the dealer's job, not by ours: **Ask the Dealer AI Assistant**
+on top, then **Acquire / Price / Merchandise / Improve Aging Inventory**. If someone asks
+where the three skills are, that is the right question — they sit underneath the
+workflows, and a workflow can use more than one.
+
+---
+
+## Beat 0 — Open on the assistant (20s)
+
+The app lands on **Ask the Dealer AI Assistant**.
+
+> "This is where a manager starts — a question in their own words, not a form."
+
+Say plainly what it does today: it captures the question and tells you routing is not
+connected yet. **Do not mime a conversation.** The honesty is the point, and the sidebar
+below it is what the rest of the demo runs on.
+
 ---
 
 ## Beat 1 — Open on the lot (45s)
 
-Land on **app**.
+Sidebar → **Acquire Inventory**.
 
 > "This is a twelve-car lot on a Tuesday morning. Eighty-six percent full, two open
 > slots, three units past ninety days, and three advertised below what they cost."
@@ -30,7 +47,7 @@ outranks a $9,000 one. That ordering is the point; say so.
 
 ## Beat 2 — Price a car (75s)
 
-Sidebar → **Vehicle Detail** → `V-10001 · 2022 Toyota RAV4`.
+Sidebar → **Price Inventory** → `V-10001 · 2022 Toyota RAV4`.
 
 Open **Ask in plain English** and hit **Extract**.
 
@@ -54,7 +71,7 @@ Scroll to **Gross against turn**:
 
 ## Beat 3 — The one that matters (90s)
 
-Sidebar → `V-10005 · 2018 BMW 540i · 108d`.
+Still in **Price Inventory**, switch the vehicle to `V-10005 · 2018 BMW 540i · 108d`.
 
 Let the red banner land before saying anything.
 
@@ -81,7 +98,7 @@ calculator.
 
 ## Beat 4 — Work the whole lot (75s)
 
-Sidebar → **Promotion**. Event: **Summer Clearance**. Target: **70%**.
+Sidebar → **Merchandise Inventory**. Event: **Summer Clearance**. Target: **70%**.
 
 > "I want the lot at seventy percent by the end of a five-day event."
 
@@ -105,7 +122,7 @@ Drag the target to **85%** to show the verdict change.
 
 ## Beat 5 — Show the receipts (30s)
 
-Back to **Vehicle Detail** → **Assumptions and audit trail**.
+Back to **Price Inventory** → **Assumptions and audit trail**.
 
 > "Every MCP call with its timestamp, the simulation seed, the assumption version, the
 > percentile convention."
@@ -132,6 +149,16 @@ disagreement widens the range and lowers confidence — it never silently averag
 **"What's the least trustworthy part?"**
 Price elasticity. It alone decides every velocity-versus-gross tradeoff and it isn't
 calibrated. It's one file, and it's labelled.
+
+**"What does Improve Aging Inventory do?"**
+Nothing yet, and the page says so. It is the fourth workflow and the reason the
+architecture is built this way: it coordinates all three skills against aged units rather
+than being a fourth skill. Today it shows the six-step sequence and which capability
+serves each step. Say that plainly — the page will contradict you otherwise.
+
+**"Can I just ask it a question?"**
+Not yet. The assistant captures the question and tells you routing is not connected. The
+workflows in the sidebar are what runs today.
 
 **"Could the AI just make up a price?"**
 Two independent guards, both tested. The calculation layer can't import a model, and any
