@@ -198,7 +198,8 @@ with left:
                 "Price to market": s["price_to_market_ratio"],
                 "Deal rating": s["deal_rating"],
                 "P50 days": s["additional_days_to_sale"]["p50"],
-                "Sold in 30d": s["sale_probabilities"]["within_30_days"],
+                # Whole percent: NumberColumn's "%%" format does not scale the value.
+                "Sold in 30d": s["sale_probabilities"]["within_30_days"] * 100.0,
                 "P50 gross": s["expected_front_end_gross"]["p50"],
                 "P50 net value": s["expected_net_economic_value"]["p50"],
                 "P10 net value": s["expected_net_economic_value"]["p10"],

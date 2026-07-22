@@ -25,7 +25,8 @@ risk_weights:
   break_even_exceeds_market: 0.10
   cost_basis: 0.14        # so dollars at stake, not just risk, drives attention
 
-top_risk_vehicle_count: 10
+# Display caps, not model assumptions: how many rows to report.
+top_risk_vehicle_count: 25
 top_contributor_count: 10
 
 # Portfolio action decision table thresholds (§14.8). Evaluated in order, first match wins.
