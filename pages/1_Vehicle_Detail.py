@@ -82,24 +82,32 @@ scenario = next(s for s in result["pricing_scenarios"] if s["strategy"] == recom
 image_column, title_column = st.columns([1, 3], vertical_alignment="center")
 
 with image_column:
-    if vehicle.get("image_url"):
-        # st.image defaults width to 'content' (original size), so unlike the dataframe
-        # and chart calls this one genuinely needs the value stated.
-        st.image(vehicle["image_url"], width="stretch")
+    # A photo when one resolves on disk; the generated silhouette only as a fallback.
+    # components.html rather than st.html throughout: Streamlit's sanitizer strips <svg>
+    # and leaves the wrapper behind, which renders as an empty bar rather than failing
+    # visibly.
+    photo_markup = None
+    photo_path = ui_components.resolve_image(vehicle.get("image_url"))
+    if photo_path is not None:
+        try:
+            photo_markup = ui_components.vehicle_photo_html(photo_path)
+        except OSError:
+            # Present in the fixture but unreadable — fall back rather than break.
+            photo_markup = None
+
+    if photo_markup is not None:
+        components.html(photo_markup, height=ui_components.CARD_HEIGHT + 6)
+        st.caption("Merchandising photo")
     else:
-        # No image source in the prototype. A generated silhouette reads as a deliberate
-        # placeholder; a broken image icon reads as a bug.
-        #
-        # components.html, not st.html: Streamlit's sanitizer strips <svg> and leaves the
-        # wrapper behind, which renders as an empty bar rather than failing visibly.
         components.html(
             ui_components.vehicle_silhouette_svg(
                 vehicle.get("segment"), vehicle.get("model")
             ),
-            height=120,
+            height=ui_components.CARD_HEIGHT + 6,
         )
         st.caption(
-            f"No photo on file · {ui_components.body_style(vehicle.get('segment'), vehicle.get('model')).title()}"
+            "No photo on file · "
+            f"{ui_components.body_style(vehicle.get('segment'), vehicle.get('model')).title()}"
         )
 
 with title_column:

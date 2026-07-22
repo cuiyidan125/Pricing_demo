@@ -13,7 +13,18 @@ Two things live here:
 
 from __future__ import annotations
 
+import base64
+import mimetypes
+from functools import lru_cache
+from pathlib import Path
+
 import plotly.graph_objects as go
+
+from pricing_agent.config.loader import REPO_ROOT
+
+# Both the photo and the silhouette render at this height, so the card is the same size
+# whichever one a vehicle gets and the page does not reflow between vehicles.
+CARD_HEIGHT = 130
 
 # Silhouettes are schematic on purpose. A crude attempt at photorealism would read as a
 # failed photo; a clean icon reads as a placeholder that someone chose.
@@ -60,6 +71,61 @@ _SEGMENT_TO_BODY = {
     "TRUCK": "TRUCK",
     "VAN": "VAN",
 }
+
+
+def resolve_image(image_url: str | None) -> Path | None:
+    """Resolve a fixture `image_url` to a file on disk, or None.
+
+    Resolved against the repository root rather than the working directory: Streamlit is
+    usually launched from the root, but a page must not depend on that, and the same path
+    is read by tests running from anywhere.
+
+    Absolute paths and remote URLs are rejected. The demo must work offline, so a runtime
+    fetch is not an acceptable fallback — an unreachable host would put a broken image in
+    front of a customer.
+    """
+    if not image_url:
+        return None
+    if image_url.startswith(("http://", "https://", "//")):
+        return None
+
+    candidate = (REPO_ROOT / image_url).resolve()
+    try:
+        candidate.relative_to(REPO_ROOT.resolve())
+    except ValueError:
+        return None  # escaped the repository
+    return candidate if candidate.is_file() else None
+
+
+@lru_cache(maxsize=32)
+def _data_uri(path: str, mtime: float) -> str:
+    """Base64 data URI for a local image. Keyed on mtime so edits invalidate the cache."""
+    file = Path(path)
+    mime = mimetypes.guess_type(file.name)[0] or "image/jpeg"
+    encoded = base64.b64encode(file.read_bytes()).decode("ascii")
+    return f"data:{mime};base64,{encoded}"
+
+
+def vehicle_photo_html(path: Path, height: int = CARD_HEIGHT) -> str:
+    """A local photo, embedded as a data URI and rendered through `components.html`.
+
+    Embedded rather than served: Streamlit will not serve arbitrary repository paths to
+    the browser, and a data URI keeps the page working with no network at all.
+
+    `object-fit: cover` fills the card at a fixed height without distorting the car —
+    the image is cropped, never stretched, which matters because a squashed vehicle in a
+    dealer demo looks like a bug.
+    """
+    uri = _data_uri(str(path), path.stat().st_mtime)
+    return f"""
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+  html,body {{ margin:0; padding:0; background:transparent; }}
+  img {{ width:100%; height:{height}px; object-fit:cover; border-radius:10px;
+         display:block; }}
+</style></head>
+<body><img src="{uri}" alt="Vehicle photograph"></body></html>
+""".strip()
 
 
 def body_style(segment: str | None, model: str | None = None) -> str:

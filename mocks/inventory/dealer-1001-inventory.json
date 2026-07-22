@@ -21,7 +21,7 @@
         "merchandising_start_date": "2026-06-19",
         "status": "ACTIVE",
         "campaign_participation": [],
-        "image_url": null
+        "image_url": "assets/vehicles/toyota_rav4_2022.jpg"
       },
       {
         "vehicle_id": "V-10002",
@@ -246,7 +246,7 @@
         "image_url": null
       }
     ],
-    "_note_image_url": "image_url is null for every vehicle: this prototype has no image source. The UI renders a generated body-style silhouette instead of a broken image. A real vAuto integration populates this from the merchandising record."
+    "_note_image_url": "image_url is a repository-relative path, resolved against the repo root rather than the working directory, and read from disk so the demo works offline. Only V-10001 carries a photo (CC0; see assets/vehicles/ATTRIBUTION.md); the rest are null and fall back to a generated body-style silhouette. A real vAuto integration would populate every row from the merchandising record."
   },
   "meta": {
     "source": "VAUTO",
