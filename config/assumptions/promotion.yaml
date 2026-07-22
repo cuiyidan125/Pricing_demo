@@ -32,7 +32,19 @@ discount_ladder:
   step_usd: 250
   max_steps: 40
 
-# §15.8 plan construction
+# §15.8 plan construction.
+#
+# The three plans must actually span the margin-versus-capacity tradeoff, which means
+# they cannot all key off the economically sensible discount. On this lot that discount
+# is $0 for most vehicles -- carrying cost is low relative to the gross given up, so the
+# net-value optimum is "do not discount". Defining BALANCED as the sensible rung made it
+# promote nothing, which is economically defensible and operationally useless: a dealer
+# opens a promotion planner because they have already decided capacity is worth paying
+# for, and they need to see what it costs.
+#
+# So: MARGIN_PROTECT respects the net-value optimum and will promote nothing when that
+# optimum is zero. BALANCED and CAPACITY_FIRST spend into the safe headroom, and the
+# gross impact they report is the price of the target.
 plans:
   MARGIN_PROTECT:
     candidate_selection: "TOP_SCORING"
@@ -40,7 +52,8 @@ plans:
     safe_discount_fraction: 0.50
   BALANCED:
     candidate_selection: "ABOVE_MEDIAN_SCORE"
-    discount_rule: "ECONOMICALLY_SENSIBLE"
+    discount_rule: "FRACTION_OF_SAFE_FLOORED_AT_SENSIBLE"
+    safe_discount_fraction: 0.60
   CAPACITY_FIRST:
     candidate_selection: "ALL_ELIGIBLE"
     discount_rule: "MAX_SAFE_WITHIN_BUDGET"
