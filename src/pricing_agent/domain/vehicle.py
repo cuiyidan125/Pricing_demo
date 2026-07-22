@@ -77,6 +77,9 @@ class Vehicle:
     days_in_inventory: int
     status: str
     campaign_participation: tuple[str, ...] = ()
+    # Merchandising photo. Null throughout the prototype: there is no image source, and
+    # the UI falls back to a generated body-style silhouette.
+    image_url: str | None = None
 
     @property
     def description(self) -> str:
@@ -116,4 +119,5 @@ class Vehicle:
             days_in_inventory=int(payload["days_in_inventory"]),
             status=payload.get("status", "ACTIVE"),
             campaign_participation=tuple(payload.get("campaign_participation") or ()),
+            image_url=payload.get("image_url"),
         )

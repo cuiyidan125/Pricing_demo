@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
+import streamlit.components.v1 as components
 
 from pricing_agent.agents import extract, intent_of
 from pricing_agent.config import load_config
@@ -18,6 +19,8 @@ from pricing_agent.llm import credentials_present, explain
 from pricing_agent.mcp_clients import MockTransport, VautoClient
 from pricing_agent.policy.price_floor import can_publish
 from pricing_agent.skills.single_vehicle import analyze
+
+import ui_components
 
 AS_OF = datetime(2026, 7, 21, 14, 0, tzinfo=timezone.utc)
 
@@ -76,11 +79,37 @@ headroom = result["promotional_headroom"]
 recommended_strategy = result["recommended_strategy"]["strategy"]
 scenario = next(s for s in result["pricing_scenarios"] if s["strategy"] == recommended_strategy)
 
-st.title(f"{vehicle['year']} {vehicle['make']} {vehicle['model']} {vehicle['trim'] or ''}".strip())
-st.caption(
-    f"{vehicle['vehicle_id']} · {vehicle['mileage']:,} miles · "
-    f"{vehicle['days_in_inventory']} days in inventory · {vehicle['condition'].title()}"
-)
+image_column, title_column = st.columns([1, 3], vertical_alignment="center")
+
+with image_column:
+    if vehicle.get("image_url"):
+        # st.image defaults width to 'content' (original size), so unlike the dataframe
+        # and chart calls this one genuinely needs the value stated.
+        st.image(vehicle["image_url"], width="stretch")
+    else:
+        # No image source in the prototype. A generated silhouette reads as a deliberate
+        # placeholder; a broken image icon reads as a bug.
+        #
+        # components.html, not st.html: Streamlit's sanitizer strips <svg> and leaves the
+        # wrapper behind, which renders as an empty bar rather than failing visibly.
+        components.html(
+            ui_components.vehicle_silhouette_svg(
+                vehicle.get("segment"), vehicle.get("model")
+            ),
+            height=120,
+        )
+        st.caption(
+            f"No photo on file · {ui_components.body_style(vehicle.get('segment'), vehicle.get('model')).title()}"
+        )
+
+with title_column:
+    st.title(
+        f"{vehicle['year']} {vehicle['make']} {vehicle['model']} {vehicle['trim'] or ''}".strip()
+    )
+    st.caption(
+        f"{vehicle['vehicle_id']} · {vehicle['mileage']:,} miles · "
+        f"{vehicle['days_in_inventory']} days in inventory · {vehicle['condition'].title()}"
+    )
 
 # --- natural-language intake (§4.2) ---------------------------------------------------
 
@@ -190,6 +219,27 @@ with st.container(border=True):
             ),
             icon="🛡️",
         )
+
+# --- aging timeline -------------------------------------------------------------------
+
+st.subheader("Where this car is in its life on the lot")
+st.plotly_chart(
+    ui_components.aging_timeline(
+        days_in_inventory=vehicle["days_in_inventory"],
+        additional_p50=scenario["additional_days_to_sale"]["p50"],
+        additional_p90=scenario["additional_days_to_sale"]["p90"],
+    )
+)
+projected = sales["projected_total_inventory_age"]
+st.caption(
+    md(
+        f"Median total age at sale **{projected['p50']:.0f} days**, "
+        f"**{projected['p90']:.0f} days** in the adverse case. "
+        f"P(over 90 days) is {sales['projected_age_exceedance']['over_90_days']:.0%}. "
+        "The whisker is the point — a car whose median clears 90 days comfortably can "
+        "still carry a tail well past it, and the tail is the real exposure."
+    )
+)
 
 # --- warnings -------------------------------------------------------------------------
 

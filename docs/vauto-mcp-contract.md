@@ -100,9 +100,17 @@ Freshness `REALTIME`. Read-only.
 | `status` | enum | `ACTIVE \| PENDING \| SOLD \| WHOLESALE` |
 | `segment` | string | required by depreciation and event-lift assumptions |
 | `powertrain` | enum | `ICE \| HYBRID \| PHEV \| BEV` — required by depreciation (§18) |
+| `image_url` | string \| null | Primary merchandising photo |
 
 `segment` and `powertrain` are additions to §9.1. Both are required inputs to the depreciation
 model, and neither is derivable from the fields §9.1 lists.
+
+`image_url` is a third addition, for display only — no calculation consumes it. It is null
+for every vehicle in `mocks/`, because this prototype has no image source and real
+manufacturer photography in a customer demo would raise licensing questions the prototype
+should not quietly take on. The UI renders a generated body-style silhouette instead, so
+the empty state looks deliberate rather than broken; populating the field in a real
+integration switches to the photograph with no code change.
 
 ---
 

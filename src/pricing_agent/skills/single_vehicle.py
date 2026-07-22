@@ -461,6 +461,7 @@ def _vehicle_block(vehicle: Vehicle) -> dict:
         "days_in_inventory": vehicle.days_in_inventory,
         "status": vehicle.status,
         "campaign_participation": list(vehicle.campaign_participation),
+        "image_url": vehicle.image_url,
     }
 
 
