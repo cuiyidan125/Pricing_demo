@@ -1,0 +1,26 @@
+{
+  "data": {
+    "dealer_id": "DEALER-1001",
+    "policy_price_floor_rule": {
+      "type": "COST_BASIS_MULTIPLE",
+      "cost_basis_multiple": 1.0,
+      "description": "Never advertise below total invested cost without approval."
+    },
+    "minimum_gross_policy": 0,
+    "risk_floor_pct": 0.72,
+    "approval_thresholds": {
+      "aggressive_adjustment_pct": 0.08,
+      "material_gross_reduction_pct": 0.20
+    },
+    "excluded_from_promotion": ["V-10010"],
+    "_note": "This tool is a PROPOSED addition (docs/vauto-mcp-contract.md §3.5). product-spec.md §11.9 and §11.10 make policy floor and risk floor two of the four inputs to minimum safe transaction price, and no tool in §10 returns them. See docs/open-questions.md C1."
+  },
+  "meta": {
+    "source": "INTERNAL_POLICY",
+    "data_timestamp": "2026-07-21T06:00:00Z",
+    "source_version": "policy-mcp-mock-0.1.0",
+    "confidence": "HIGH",
+    "coverage": 1.0,
+    "freshness_class": "DAILY"
+  }
+}

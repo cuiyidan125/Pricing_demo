@@ -1,0 +1,164 @@
+{
+  "suite": "portfolio",
+  "spec_ref": "product-spec.md §26.2",
+  "default_as_of": "2026-07-21T14:00:00Z",
+  "baseline": {
+    "total_physical_slots": 14,
+    "current_inventory": 12,
+    "reserved_slots": 3,
+    "confirmed_inbound": 2,
+    "target_utilization": 0.85,
+    "current_utilization": 0.857
+  },
+
+  "scenarios": [
+    {
+      "id": "PF-01",
+      "name": "Healthy portfolio with open capacity",
+      "mutations": [
+        { "op": "set", "path": "capacity.total_physical_slots", "value": 20 },
+        { "op": "set", "path": "capacity.target_utilization", "value": 0.85 }
+      ],
+      "expect": {
+        "warnings_must_not_include": ["PROJECTED_CAPACITY_OVER_TARGET", "PROJECTED_CAPACITY_OVER_100_PERCENT"],
+        "assertions": [
+          "current_utilization 0.60 is below target",
+          "one_month_forecast and three_month_forecast are both returned",
+          "every distribution in both forecasts shares the run's simulation_id"
+        ]
+      }
+    },
+    {
+      "id": "PF-02",
+      "name": "Inventory utilization over target",
+      "mutations": [],
+      "expect": {
+        "warnings_must_include": ["PROJECTED_CAPACITY_OVER_TARGET"],
+        "assertions": [
+          "current_utilization 0.857 exceeds target 0.85",
+          "capacity_position.reserved_not_inbound equals 1 (reserved 3 minus confirmed_inbound 2)",
+          "utilization is computed against total_physical_slots, not effective slots (D6)"
+        ]
+      }
+    },
+    {
+      "id": "PF-03",
+      "name": "Projected utilization over 100 percent",
+      "mutations": [
+        { "op": "set", "path": "capacity.total_physical_slots", "value": 13 },
+        { "op": "set", "path": "inbound.IN-2003.committed_slot", "value": true }
+      ],
+      "expect": {
+        "warnings_must_include": ["PROJECTED_CAPACITY_OVER_100_PERCENT", "INBOUND_CAPACITY_CONFLICT"],
+        "assertions": [
+          "12 current + 3 confirmed inbound against 13 slots cannot fit",
+          "arrivals that cannot physically fit are DEFERRED in the simulation, not dropped -- modeling an impossible ending utilization would understate the cost of being full",
+          "risk_probabilities.utilization_above_100_percent > 0"
+        ]
+      }
+    },
+    {
+      "id": "PF-04",
+      "name": "High aged-inventory concentration",
+      "mutations": [],
+      "expect": {
+        "warnings_must_include": ["HIGH_AGED_INVENTORY_CONCENTRATION"],
+        "assertions": [
+          "V-10004 (96d), V-10005 (108d), V-10012 (130d) are over 90 days -- 3 of 12, or 25%, at the configured threshold",
+          "aging_profile buckets sum to active_inventory_count",
+          "projected_unit_count_at_horizon comes from the draws, so future aging is answered rather than inferred"
+        ]
+      }
+    },
+    {
+      "id": "PF-05",
+      "name": "One-month revenue below target",
+      "mutations": [{ "op": "set", "path": "request.targets.revenue_target_one_month", "value": 250000 }],
+      "expect": {
+        "warnings_must_include": ["ONE_MONTH_REVENUE_BELOW_TARGET"],
+        "assertions": [
+          "risk_probabilities.revenue_below_target is a direct draw count, not a normal approximation",
+          "the result leads with the probability of missing the target",
+          "sales_revenue is reported as a distribution, never as a point estimate"
+        ]
+      }
+    },
+    {
+      "id": "PF-06",
+      "name": "Three-month forecast without acquisition data",
+      "mutations": [],
+      "spec_ref": "§14.6",
+      "expect": {
+        "warnings_must_include": ["FUTURE_ACQUISITION_DATA_UNAVAILABLE"],
+        "assertions": [
+          "forecast_basis.mode is RUN_OFF -- this is the DEFAULT path, since no MCP tool supplies planned acquisitions",
+          "forecast_basis.lower_bound_note is present and non-empty (schema-enforced)",
+          "ending inventory, utilization, and revenue are labeled lower bounds",
+          "FUTURE_ACQUISITION_DATA_UNAVAILABLE is severity INFO, not an error"
+        ]
+      }
+    },
+    {
+      "id": "PF-07",
+      "name": "Large inbound inventory conflict",
+      "mutations": [
+        { "op": "append", "path": "inbound.vehicles", "value": { "inbound_id": "IN-2004", "expected_arrival_date": "2026-07-26", "segment": "SUV", "committed_slot": true, "acquisition_status": "PURCHASED", "estimated_cost_basis": 27500 } },
+        { "op": "append", "path": "inbound.vehicles", "value": { "inbound_id": "IN-2005", "expected_arrival_date": "2026-07-27", "segment": "SUV", "committed_slot": true, "acquisition_status": "PURCHASED", "estimated_cost_basis": 25900 } }
+      ],
+      "expect": {
+        "warnings_must_include": ["INBOUND_CAPACITY_CONFLICT"],
+        "assertions": [
+          "4 committed inbound units against 2 open physical slots",
+          "the conflict is detected from primitives, not from a derived field returned by the capacity tool"
+        ]
+      }
+    },
+    {
+      "id": "PF-08",
+      "name": "Significant below-break-even exposure",
+      "mutations": [
+        { "op": "set", "path": "cost_basis.V-10004.reconditioning_cost", "value": 4200 },
+        { "op": "set", "path": "cost_basis.V-10011.reconditioning_cost", "value": 3900 }
+      ],
+      "expect": {
+        "warnings_must_include": ["HIGH_PERCENTAGE_BELOW_BREAK_EVEN"],
+        "assertions": [
+          "V-10004, V-10005, and V-10011 all price below break-even -- 3 of 12, above the 10% threshold",
+          "HIGH_PERCENTAGE_BELOW_BREAK_EVEN is CRITICAL but NOT BLOCKING: it is a portfolio finding, and BLOCKING is reserved for §19.1 publication bars",
+          "financial_risk.total_exposure_below_break_even sums the shortfalls in dollars"
+        ]
+      }
+    },
+    {
+      "id": "PF-09",
+      "name": "Partial data coverage",
+      "mutations": [
+        { "op": "remove", "path": "cost_basis.V-10003" },
+        { "op": "remove", "path": "cost_basis.V-10007" },
+        { "op": "remove", "path": "cost_basis.V-10009" }
+      ],
+      "expect": {
+        "warnings_must_include": ["INCOMPLETE_INVENTORY_DATA", "LOW_PORTFOLIO_FORECAST_CONFIDENCE"],
+        "assertions": [
+          "data_coverage.coverage_ratio is 0.75, below the 0.80 confidence threshold",
+          "the three vehicles are counted in data_coverage.missing_cost_basis, not silently dropped",
+          "they are excluded from break-even aggregates but still appear in inventory counts"
+        ]
+      }
+    },
+    {
+      "id": "PF-10",
+      "name": "Portfolio aggregation is draw-level",
+      "mutations": [],
+      "spec_ref": "§14.7, D2",
+      "expect": {
+        "assertions": [
+          "portfolio sales_revenue.p50 is STRICTLY LESS than the sum of per-vehicle transaction_price.p50 over vehicles with P(sale within 30d) > 0.5",
+          "summing per-vehicle medians credits every vehicle with a median outcome simultaneously and overstates the portfolio median",
+          "unit_sales, sales_revenue, front_end_gross, and net_economic_value all carry the same simulation_id",
+          "this is the regression test for the §14.7 prohibition"
+        ]
+      }
+    }
+  ]
+}

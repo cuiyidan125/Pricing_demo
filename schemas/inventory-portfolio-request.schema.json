@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pricing-demo.local/schemas/inventory-portfolio-request.schema.json",
+  "title": "Inventory Portfolio Request",
+  "description": "product-spec.md §14. As with the single-vehicle request, no computed field appears here and additionalProperties is false.",
+  "type": "object",
+
+  "properties": {
+    "request_id": { "type": "string" },
+    "dealer_id": { "type": "string" },
+    "user_id": { "type": "string" },
+    "as_of": { "type": "string", "format": "date-time" },
+
+    "scope": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "array",
+          "items": { "enum": ["ACTIVE", "PENDING", "IN_RECON"] },
+          "default": ["ACTIVE"]
+        },
+        "include_inbound": { "type": "boolean", "default": true },
+        "segments": { "type": "array", "items": { "$ref": "common-types.schema.json#/$defs/segment" } },
+        "exclude_vehicle_ids": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+
+    "horizons": {
+      "type": "object",
+      "properties": {
+        "one_month_days": { "type": "integer", "default": 30 },
+        "three_month_days": { "type": "integer", "default": 90 }
+      },
+      "additionalProperties": false
+    },
+
+    "targets": {
+      "type": "object",
+      "description": "Optional. Drives ONE_MONTH_REVENUE_BELOW_TARGET and the capacity warnings.",
+      "properties": {
+        "revenue_target_one_month": { "type": ["number", "null"] },
+        "revenue_target_three_month": { "type": ["number", "null"] },
+        "target_utilization": { "type": ["number", "null"], "minimum": 0, "maximum": 1.5 }
+      },
+      "additionalProperties": false
+    },
+
+    "requested_outputs": {
+      "type": "array",
+      "items": {
+        "enum": ["VALUATION", "ONE_MONTH_FORECAST", "THREE_MONTH_FORECAST",
+                 "AGING_PROFILE", "CAPACITY", "RISK_RANKING", "ACTIONS"]
+      }
+    },
+
+    "extraction_provenance": {
+      "type": "array",
+      "items": { "$ref": "common-types.schema.json#/$defs/fieldProvenance" }
+    }
+  },
+
+  "required": ["request_id", "dealer_id", "user_id", "as_of"],
+  "additionalProperties": false
+}

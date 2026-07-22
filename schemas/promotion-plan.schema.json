@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pricing-demo.local/schemas/promotion-plan.schema.json",
+  "title": "Promotion Plan",
+  "description": "product-spec.md §15.8. All three plans and the no-promotion baseline share one seed, so differences between them reflect the price change rather than sampling noise. Incremental figures are computed per draw against the baseline, then summarized.",
+  "type": "object",
+
+  "properties": {
+    "plan_id": { "type": "string" },
+    "plan_type": { "enum": ["MARGIN_PROTECT", "BALANCED", "CAPACITY_FIRST"] },
+    "simulation": { "$ref": "common-types.schema.json#/$defs/simulationRef" },
+
+    "vehicles_selected": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "vehicle_id": { "type": "string" },
+          "current_list_price": { "$ref": "common-types.schema.json#/$defs/money" },
+          "promotion_price": { "$ref": "common-types.schema.json#/$defs/money" },
+          "discount": { "$ref": "common-types.schema.json#/$defs/money" },
+          "dealer_funded_discount": { "$ref": "common-types.schema.json#/$defs/money" },
+          "partner_funded_incentive": {
+            "$ref": "common-types.schema.json#/$defs/money",
+            "description": "Excluded from the dealer budget but included in the customer-facing price."
+          },
+          "minimum_safe_list_price": { "$ref": "common-types.schema.json#/$defs/money" },
+          "expected_incremental_sale_probability": { "type": "number" }
+        },
+        "required": ["vehicle_id", "current_list_price", "promotion_price", "discount", "dealer_funded_discount"]
+      }
+    },
+
+    "totals": {
+      "type": "object",
+      "properties": {
+        "vehicle_count": { "type": "integer" },
+        "total_discount": { "$ref": "common-types.schema.json#/$defs/money" },
+        "total_dealer_funded": { "$ref": "common-types.schema.json#/$defs/money" },
+        "total_partner_funded": { "$ref": "common-types.schema.json#/$defs/money" },
+        "budget_limit": { "type": ["number", "null"] },
+        "within_budget": { "type": "boolean" }
+      },
+      "required": ["vehicle_count", "total_discount", "total_dealer_funded", "within_budget"]
+    },
+
+    "outcomes": {
+      "type": "object",
+      "description": "Distributions, all sharing this plan's simulation_id.",
+      "properties": {
+        "incremental_units_sold": { "$ref": "common-types.schema.json#/$defs/percentileSet" },
+        "total_units_sold": { "$ref": "common-types.schema.json#/$defs/percentileSet" },
+        "ending_inventory": { "$ref": "common-types.schema.json#/$defs/percentileSet" },
+        "ending_utilization": { "$ref": "common-types.schema.json#/$defs/percentileSet" },
+        "probability_target_achieved": { "type": "number", "minimum": 0, "maximum": 1 },
+        "gross_impact": {
+          "$ref": "common-types.schema.json#/$defs/percentileSet",
+          "description": "Change in front-end gross versus the no-promotion baseline. Negative values are expected for capacity-first plans."
+        },
+        "cash_holding_cost_savings": { "$ref": "common-types.schema.json#/$defs/percentileSet" },
+        "depreciation_savings": { "$ref": "common-types.schema.json#/$defs/percentileSet" },
+        "slot_days_released": { "$ref": "common-types.schema.json#/$defs/percentileSet" },
+        "net_economic_value_impact": { "$ref": "common-types.schema.json#/$defs/percentileSet" }
+      },
+      "required": [
+        "incremental_units_sold", "ending_inventory", "ending_utilization",
+        "probability_target_achieved", "gross_impact"
+      ]
+    },
+
+    "warnings": { "type": "array", "items": { "$ref": "warning.schema.json" } },
+    "approvals_required": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "approval_type": { "type": "string" },
+          "trigger": { "type": "string" },
+          "observed": { "type": ["number", "null"] },
+          "threshold": { "type": ["number", "null"] }
+        },
+        "required": ["approval_type", "trigger"]
+      }
+    }
+  },
+
+  "required": ["plan_id", "plan_type", "simulation", "vehicles_selected", "totals", "outcomes", "warnings", "approvals_required"]
+}

@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pricing-demo.local/schemas/inventory-sales-forecast.schema.json",
+  "title": "Inventory Sales Forecast",
+  "description": "product-spec.md §14.5, §14.6. Implements D2. Every distribution here is produced by summing across vehicles WITHIN each draw and then summarizing across draws -- never by adding per-vehicle percentiles, which §14.7 forbids. Summing vehicle-level P50 revenue overstates portfolio P50 revenue, because it credits every vehicle with a median outcome simultaneously.",
+  "type": "object",
+
+  "properties": {
+    "horizon_days": { "type": "integer" },
+    "simulation": { "$ref": "common-types.schema.json#/$defs/simulationRef" },
+
+    "unit_sales": { "$ref": "common-types.schema.json#/$defs/percentileSet" },
+    "sales_revenue": { "$ref": "common-types.schema.json#/$defs/percentileSet" },
+    "front_end_gross": { "$ref": "common-types.schema.json#/$defs/percentileSet" },
+    "net_economic_value": { "$ref": "common-types.schema.json#/$defs/percentileSet" },
+
+    "ending_inventory": {
+      "$ref": "common-types.schema.json#/$defs/percentileSet",
+      "description": "Downside tail is P90 -- more inventory remaining is the adverse case."
+    },
+    "ending_utilization": {
+      "$ref": "common-types.schema.json#/$defs/percentileSet",
+      "description": "Against total_physical_slots (D6)."
+    },
+    "open_slots": { "$ref": "common-types.schema.json#/$defs/percentileSet" },
+
+    "inbound_inventory_count": { "type": "integer" },
+    "cash_holding_cost": { "$ref": "common-types.schema.json#/$defs/percentileSet" },
+    "depreciation_loss": { "$ref": "common-types.schema.json#/$defs/percentileSet" },
+
+    "risk_probabilities": {
+      "type": "object",
+      "description": "Direct draw counts, not normal approximations: these distributions are skewed and bounded, and a normal approximation would misstate exactly the tail being asked about.",
+      "properties": {
+        "revenue_below_target": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "utilization_above_target": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "utilization_above_100_percent": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+
+    "forecast_basis": {
+      "type": "object",
+      "description": "§14.6. RUN_OFF is the MVP default path, not an edge case: no MCP tool supplies planned acquisitions.",
+      "properties": {
+        "mode": { "enum": ["FULL", "RUN_OFF"] },
+        "includes_confirmed_inbound": { "type": "boolean" },
+        "includes_expected_acquisitions": { "type": "boolean" },
+        "includes_scheduled_events": { "type": "boolean" },
+        "lower_bound_note": {
+          "type": ["string", "null"],
+          "description": "Required when mode is RUN_OFF. Ending inventory, utilization, and revenue are LOWER BOUNDS, because a real dealer replaces sold units. A manager reading a 90-day run-off forecast showing utilization falling to 40% would otherwise draw the opposite of the correct conclusion."
+        }
+      },
+      "required": ["mode", "includes_confirmed_inbound", "includes_expected_acquisitions"]
+    }
+  },
+
+  "required": [
+    "horizon_days", "simulation", "unit_sales", "sales_revenue", "front_end_gross",
+    "net_economic_value", "ending_inventory", "ending_utilization",
+    "cash_holding_cost", "depreciation_loss", "risk_probabilities", "forecast_basis"
+  ],
+
+  "allOf": [
+    {
+      "if": {
+        "properties": { "forecast_basis": { "properties": { "mode": { "const": "RUN_OFF" } }, "required": ["mode"] } },
+        "required": ["forecast_basis"]
+      },
+      "then": {
+        "properties": {
+          "forecast_basis": {
+            "properties": { "lower_bound_note": { "type": "string", "minLength": 1 } },
+            "required": ["lower_bound_note"]
+          }
+        }
+      }
+    }
+  ]
+}

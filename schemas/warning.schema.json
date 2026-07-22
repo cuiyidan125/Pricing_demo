@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pricing-demo.local/schemas/warning.schema.json",
+  "title": "Warning",
+  "description": "product-spec.md §20. Severity mapping is D7: BLOCKING is reserved exclusively for the §19.1 publication bars, so 'blocking' always means publication is refused and never merely 'serious'. Authoritative mapping: config/assumptions/warnings.yaml.",
+  "type": "object",
+
+  "properties": {
+    "code": {
+      "enum": [
+        "INSUFFICIENT_VEHICLE_DATA",
+        "LOW_VALUATION_CONFIDENCE",
+        "EXTERNAL_PROVIDER_VARIANCE",
+        "EXTERNAL_VALUATION_UNAVAILABLE",
+        "CURRENT_PRICE_POOR_DEAL",
+        "RECOMMENDED_PRICE_POOR_DEAL",
+        "P50_PROJECTED_INVENTORY_AGE_OVER_90_DAYS",
+        "P90_PROJECTED_INVENTORY_AGE_OVER_90_DAYS",
+        "P50_PROJECTED_INVENTORY_AGE_OVER_120_DAYS",
+        "P90_PROJECTED_INVENTORY_AGE_OVER_120_DAYS",
+        "HIGH_DEPRECIATION_RISK",
+        "PRICE_BELOW_CURRENT_BREAK_EVEN",
+        "P50_TRANSACTION_PRICE_BELOW_BREAK_EVEN",
+        "P10_TRANSACTION_PRICE_BELOW_BREAK_EVEN",
+        "MINIMUM_SAFE_LIST_PRICE_VIOLATION",
+        "BREAK_EVEN_EXCEEDS_MARKET_VALUE",
+        "BREAK_EVEN_MARKET_CROSSOVER_RISK",
+        "HIGH_PROBABILITY_OF_NEGATIVE_NET_VALUE",
+        "DISCOUNT_EXCEEDS_SAFE_HEADROOM",
+        "HOLDING_COST_EXCEEDS_INCREMENTAL_GROSS",
+
+        "INCOMPLETE_INVENTORY_DATA",
+        "STALE_MARKET_DATA",
+        "LOW_PORTFOLIO_FORECAST_CONFIDENCE",
+        "HIGH_AGED_INVENTORY_CONCENTRATION",
+        "HIGH_PROJECTED_DEPRECIATION",
+        "PROJECTED_CAPACITY_OVER_TARGET",
+        "PROJECTED_CAPACITY_OVER_100_PERCENT",
+        "INBOUND_CAPACITY_CONFLICT",
+        "ONE_MONTH_REVENUE_BELOW_TARGET",
+        "THREE_MONTH_REVENUE_BELOW_TARGET",
+        "HIGH_PORTFOLIO_HOLDING_COST",
+        "HIGH_PERCENTAGE_BELOW_BREAK_EVEN",
+        "FUTURE_ACQUISITION_DATA_UNAVAILABLE",
+
+        "UNREALISTIC_INVENTORY_TARGET",
+        "INSUFFICIENT_SAFE_PROMOTION_CANDIDATES",
+        "PROMOTION_BUDGET_EXCEEDED",
+        "PROMOTIONAL_PRICE_BELOW_BREAK_EVEN",
+        "PROMOTION_EXCEEDS_SAFE_HEADROOM",
+        "LOW_EXPECTED_EVENT_LIFT",
+        "PROMOTION_COST_EXCEEDS_EXPECTED_SAVINGS",
+        "VEHICLE_EXPECTED_TO_SELL_BEFORE_EVENT",
+        "PRICE_CANNIBALIZATION_RISK",
+        "VEHICLE_ALREADY_ASSIGNED_TO_CAMPAIGN",
+        "CAPACITY_TARGET_UNLIKELY_TO_BE_ACHIEVED",
+        "EMERGENCY_MARKDOWN_APPROVAL_REQUIRED"
+      ]
+    },
+    "severity": { "enum": ["INFO", "LOW", "MEDIUM", "HIGH", "CRITICAL", "BLOCKING"] },
+    "scope": { "enum": ["VEHICLE", "PORTFOLIO", "PLAN"] },
+    "subject_id": {
+      "type": ["string", "null"],
+      "description": "vehicle_id, dealer_id, or plan id depending on scope."
+    },
+    "message": { "type": "string" },
+
+    "observed": {
+      "type": ["number", "null"],
+      "description": "Mandatory in practice: the user must see the margin by which a rule was missed, not only that it was."
+    },
+    "threshold": { "type": ["number", "null"] },
+    "unit": { "$ref": "common-types.schema.json#/$defs/unit" },
+
+    "remediation": { "type": "string" },
+    "blocks_publication": {
+      "type": "boolean",
+      "description": "True only for the §19.1 bars and stale REALTIME-class data at publication."
+    },
+    "requires_approval": { "type": "boolean" }
+  },
+
+  "required": ["code", "severity", "scope", "message", "observed", "threshold", "unit", "blocks_publication"],
+
+  "allOf": [
+    {
+      "description": "D7 invariant: BLOCKING severity and blocks_publication must agree.",
+      "if": { "properties": { "severity": { "const": "BLOCKING" } }, "required": ["severity"] },
+      "then": { "properties": { "blocks_publication": { "const": true } } }
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pricing-demo.local/schemas/depreciation-forecast.schema.json",
+  "title": "Depreciation Forecast",
+  "description": "product-spec.md §13.7, §18. Implements D1. §13.7 originally requested both 'P90 value at sale' and 'P90 depreciation loss'; those are not the same scenario, because the 90th percentile of loss corresponds to the 10th percentile of value. Both quantities are emitted here as full percentile sets on their OWN distributions. Downside tail is P10 for value_at_sale and P90 for depreciation_loss.",
+  "type": "object",
+
+  "properties": {
+    "simulation": { "$ref": "common-types.schema.json#/$defs/simulationRef" },
+
+    "current_market_value": { "$ref": "common-types.schema.json#/$defs/money" },
+
+    "monthly_depreciation_rate": {
+      "type": "number",
+      "description": "Effective rate after segment, powertrain, age, mileage, and trend multipliers. Prototype assumption, not fitted."
+    },
+    "rate_components": {
+      "type": "object",
+      "properties": {
+        "segment_rate": { "type": "number" },
+        "powertrain_multiplier": { "type": "number" },
+        "vehicle_age_multiplier": { "type": "number" },
+        "mileage_multiplier": { "type": "number" },
+        "market_trend_multiplier": { "type": "number" }
+      }
+    },
+
+    "value_at_sale": {
+      "$ref": "common-types.schema.json#/$defs/percentileSet",
+      "description": "Market value at the modeled sale date. DOWNSIDE IS P10."
+    },
+
+    "depreciation_loss": {
+      "$ref": "common-types.schema.json#/$defs/percentileSet",
+      "description": "current_market_value - value_at_sale, computed per draw. DOWNSIDE IS P90. Note that depreciation_loss.p90 and value_at_sale.p10 describe the same draws; depreciation_loss.p90 and value_at_sale.p90 do not."
+    },
+
+    "data_source": { "$ref": "common-types.schema.json#/$defs/sourceMeta" },
+    "confidence": { "$ref": "common-types.schema.json#/$defs/confidence" },
+    "model_version": { "type": "string" }
+  },
+
+  "required": [
+    "simulation", "current_market_value", "monthly_depreciation_rate",
+    "value_at_sale", "depreciation_loss", "confidence", "model_version"
+  ]
+}

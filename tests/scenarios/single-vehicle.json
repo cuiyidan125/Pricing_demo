@@ -1,0 +1,244 @@
+{
+  "suite": "single-vehicle",
+  "spec_ref": "product-spec.md §26.1",
+  "default_as_of": "2026-07-21T14:00:00Z",
+  "notes": "Each scenario names the fixture state it depends on and the observable outcome. 'mutations' are applied to the mock data before the run, so a scenario never depends on editing a shared fixture in place.",
+
+  "scenarios": [
+    {
+      "id": "SV-01",
+      "name": "High-confidence vehicle with strong comparables",
+      "vehicle_id": "V-10001",
+      "mutations": [],
+      "expect": {
+        "valuation_confidence_level": "HIGH",
+        "valuation_anchor": "EXTERNAL",
+        "internal_check_computed": true,
+        "comparables_included_min": 5,
+        "warnings_must_not_include": ["LOW_VALUATION_CONFIDENCE", "INSUFFICIENT_VEHICLE_DATA", "EXTERNAL_VALUATION_UNAVAILABLE"],
+        "assertions": [
+          "L-1001-H (stale $34,900 listing, 142 days on market) is trimmed or down-weighted and does not raise the internal estimate above the external anchor by more than 5%",
+          "pricing_scenarios has exactly 3 entries sharing one simulation_id",
+          "MAXIMIZE_GROSS price >= BALANCED price >= INCREASE_VELOCITY price"
+        ]
+      }
+    },
+    {
+      "id": "SV-02",
+      "name": "Poor-deal current price",
+      "vehicle_id": "V-10002",
+      "mutations": [],
+      "expect": {
+        "warnings_must_include": ["CURRENT_PRICE_POOR_DEAL"],
+        "assertions": [
+          "price_to_market_ratio > poor_deal_threshold",
+          "recommended BALANCED price is below current_list_price",
+          "no BLOCKING warning: an overpriced vehicle is a repricing opportunity, not a publication bar"
+        ]
+      }
+    },
+    {
+      "id": "SV-03",
+      "name": "P50 under 90 days, P90 over 90 days",
+      "vehicle_id": "V-10003",
+      "mutations": [],
+      "expect": {
+        "warnings_must_include": ["P90_PROJECTED_INVENTORY_AGE_OVER_90_DAYS"],
+        "warnings_must_not_include": ["P50_PROJECTED_INVENTORY_AGE_OVER_90_DAYS"],
+        "assertions": [
+          "projected_total_inventory_age.p50 < 90 and .p90 > 90",
+          "the P90 warning is severity LOW -- a 10% chance of exceeding 90 days is unremarkable, and ranking it above its P50 counterpart would invert the alarm"
+        ]
+      }
+    },
+    {
+      "id": "SV-04",
+      "name": "Both P50 and P90 over 90 days",
+      "vehicle_id": "V-10004",
+      "mutations": [],
+      "expect": {
+        "warnings_must_include": ["P50_PROJECTED_INVENTORY_AGE_OVER_90_DAYS", "P90_PROJECTED_INVENTORY_AGE_OVER_90_DAYS"],
+        "assertions": [
+          "P50 warning severity is MEDIUM, strictly above the LOW severity of the P90 warning",
+          "recommended strategy is INCREASE_VELOCITY",
+          "days_in_inventory 96 already exceeds 90, so projected age exceeds it in every draw"
+        ]
+      }
+    },
+    {
+      "id": "SV-05",
+      "name": "Break-even above market value (underwater)",
+      "vehicle_id": "V-10005",
+      "mutations": [],
+      "expect": {
+        "warnings_must_include": ["BREAK_EVEN_EXCEEDS_MARKET_VALUE"],
+        "assertions": [
+          "current_accounting_break_even (~$28,963) > market_value ($25,100)",
+          "market_value_crossover_risk.break_even_exceeds_market_value_now is true",
+          "the system does NOT recommend a price above the market ceiling to manufacture a paper break-even",
+          "approvals_required includes LOSS_MINIMIZATION",
+          "expected_front_end_gross.p50 is negative and is reported as negative, not clamped to zero"
+        ]
+      }
+    },
+    {
+      "id": "SV-06",
+      "name": "Promotional discount below floor",
+      "vehicle_id": "V-10011",
+      "mutations": [{ "op": "set", "path": "promotion.requested_discount", "value": 1500 }],
+      "expect": {
+        "warnings_must_include": ["DISCOUNT_EXCEEDS_SAFE_HEADROOM"],
+        "assertions": [
+          "max_safe_discount is well under $1,500 (list $19,495 vs minimum_safe_list_price ~$18,822)",
+          "DISCOUNT_EXCEEDS_SAFE_HEADROOM is BLOCKING and blocks_publication is true",
+          "the recommended price is reported unchanged next to the warning, never silently raised to the floor"
+        ]
+      }
+    },
+    {
+      "id": "SV-07",
+      "name": "Large safe headroom",
+      "vehicle_id": "V-10008",
+      "mutations": [],
+      "expect": {
+        "warnings_must_not_include": ["DISCOUNT_EXCEEDS_SAFE_HEADROOM", "MINIMUM_SAFE_LIST_PRICE_VIOLATION"],
+        "assertions": [
+          "max_safe_discount > $3,000 (list $27,995 against a cost basis near $23,615)",
+          "promotional_headroom.reserves sum to max_safe_discount",
+          "economically_sensible_discount < max_safe_discount -- the optimum is interior, not at the floor"
+        ]
+      }
+    },
+    {
+      "id": "SV-08",
+      "name": "Insufficient comparables",
+      "vehicle_id": "V-10009",
+      "mutations": [],
+      "expect": {
+        "warnings_must_include": ["LOW_VALUATION_CONFIDENCE"],
+        "valuation_anchor": "EXTERNAL",
+        "internal_check_computed": false,
+        "assertions": [
+          "only 2 comparables exist, below min_comparables (5)",
+          "valuation.internal_estimate is null -- a weighted median of two listings must not be presented as a second opinion",
+          "valuation.divergence is null",
+          "a valuation is still returned, from the external anchor alone"
+        ]
+      }
+    },
+    {
+      "id": "SV-09",
+      "name": "Stale vAuto data",
+      "vehicle_id": "V-10010",
+      "as_of_override": "2026-07-23T14:00:00Z",
+      "mutations": [],
+      "expect": {
+        "warnings_must_include": ["STALE_MARKET_DATA"],
+        "assertions": [
+          "market position effective_date 2026-07-18 exceeds the DAILY 24h threshold at the overridden as_of",
+          "analysis still completes -- stale data degrades, it does not stop the analysis",
+          "valuation confidence is reduced one level",
+          "publication is barred only if a REALTIME-class source is also stale",
+          "staleness comes from advancing as_of, not from editing the fixture (D8)"
+        ]
+      }
+    },
+    {
+      "id": "SV-10",
+      "name": "High depreciation EV",
+      "vehicle_id": "V-10006",
+      "mutations": [],
+      "expect": {
+        "warnings_must_include": ["HIGH_DEPRECIATION_RISK"],
+        "assertions": [
+          "effective monthly rate reflects EV segment 0.026 x BEV multiplier 1.45",
+          "EV segment median_days_to_sale is 68, so the holding period is long and compounds the loss",
+          "depreciation_loss.p90 corresponds to value_at_sale.p10, NOT value_at_sale.p90 -- the D1 inversion check",
+          "both value_at_sale and depreciation_loss are emitted as full percentile sets"
+        ]
+      }
+    },
+    {
+      "id": "SV-11",
+      "name": "Loss-minimization exception",
+      "vehicle_id": "V-10005",
+      "mutations": [{ "op": "set", "path": "request.proposed_price", "value": 23500 }],
+      "expect": {
+        "warnings_must_include": ["P50_TRANSACTION_PRICE_BELOW_BREAK_EVEN"],
+        "assertions": [
+          "P50_TRANSACTION_PRICE_BELOW_BREAK_EVEN is BLOCKING",
+          "approvals_required includes LOSS_MINIMIZATION",
+          "the approval payload quantifies all five §19.2 figures: immediate_loss, expected_future_loss, expected_holding_cost, expected_depreciation, capacity_opportunity_cost",
+          "the system presents both sides of the comparison and does not decide",
+          "publication remains barred until an approval_id exists"
+        ]
+      }
+    },
+    {
+      "id": "SV-12",
+      "name": "Missing cost basis is a hard stop",
+      "vehicle_id": "V-10001",
+      "mutations": [{ "op": "remove", "path": "cost_basis.V-10001" }],
+      "spec_ref": "architecture.md §9",
+      "expect": {
+        "warnings_must_include": ["INSUFFICIENT_VEHICLE_DATA"],
+        "assertions": [
+          "INSUFFICIENT_VEHICLE_DATA escalates to BLOCKING when cost basis is missing",
+          "no break_even_analysis is produced",
+          "no pricing recommendation is produced -- a recommendation without a floor is the failure §4.5 exists to prevent",
+          "the agent asks for acquisition and reconditioning cost rather than estimating them"
+        ]
+      }
+    },
+    {
+      "id": "SV-13",
+      "name": "External valuation unavailable",
+      "vehicle_id": "V-10001",
+      "mutations": [
+        { "op": "fail_tool", "tool": "get_vehicle_market_position", "status": "UNAVAILABLE" },
+        { "op": "fail_tool", "tool": "get_vehicle_pricing_recommendation", "status": "UNAVAILABLE" }
+      ],
+      "spec_ref": "D5 branch 4",
+      "expect": {
+        "warnings_must_include": ["EXTERNAL_VALUATION_UNAVAILABLE"],
+        "valuation_anchor": "INTERNAL_FALLBACK",
+        "assertions": [
+          "market_value falls back to the internal comparable estimate",
+          "confidence is capped at MEDIUM",
+          "analysis completes rather than failing"
+        ]
+      }
+    },
+    {
+      "id": "SV-14",
+      "name": "Valuation source divergence",
+      "vehicle_id": "V-10001",
+      "mutations": [{ "op": "set", "path": "recommendations.V-10001.recommended_price", "value": 25400 }],
+      "spec_ref": "D5",
+      "expect": {
+        "warnings_must_include": ["EXTERNAL_PROVIDER_VARIANCE"],
+        "assertions": [
+          "divergence exceeds 0.10, so severity escalates to HIGH",
+          "market_supported_range widens to contain both estimates",
+          "market_value REMAINS the external anchor -- divergence never moves the point estimate toward the internal figure",
+          "valuation confidence drops one level"
+        ]
+      }
+    },
+    {
+      "id": "SV-15",
+      "name": "Shopper engagement unavailable",
+      "vehicle_id": "V-10006",
+      "mutations": [],
+      "spec_ref": "§9.8",
+      "expect": {
+        "assertions": [
+          "V-10006 has no engagement fixture entry",
+          "the hazard model drops the engagement term rather than substituting a default multiplier",
+          "confidence is reduced",
+          "no calculation fails -- no downstream figure may require this tool"
+        ]
+      }
+    }
+  ]
+}

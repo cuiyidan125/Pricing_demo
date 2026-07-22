@@ -1,0 +1,27 @@
+# Holding cost. Implements D3.
+#
+# CRITICAL: cash_holding_cost and slot_opportunity_cost are reported separately and must
+# never be summed into one field. Slot opportunity cost is imputed and is excluded from
+# break-even, minimum safe transaction price, and all §19.1 publication bars.
+# See docs/fail-safe-policy.md §1.
+
+# --- Cash costs: out-of-pocket or accrued. Enter break-even. ---
+cash:
+  floorplan_annual_rate: 0.0875     # applied to financed amount
+  lot_allocation_per_day: 3.25
+  insurance_per_day: 1.10
+  maintenance_per_day: 1.75
+  administrative_per_day: 2.40
+
+# --- Imputed cost: economic only. Never enters a price floor. ---
+slot_opportunity:
+  # Circular by nature: the value of a slot depends on the portfolio that would occupy it.
+  # The prototype uses a configured constant rather than solving the fixed point.
+  # See docs/open-questions.md C2.
+  cost_per_day: 9.00
+  # Scales with utilization: a full lot makes each slot more valuable.
+  utilization_scaling:
+    enabled: true
+    at_utilization_0.60: 0.5
+    at_utilization_0.85: 1.0
+    at_utilization_1.00: 1.8

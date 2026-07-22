@@ -1,0 +1,61 @@
+# Valuation assumptions. See docs/valuation-methodology.md.
+# Implements D5: vAuto primary, internal comparable engine as check.
+
+comparable_selection:
+  max_year_difference: 2
+  max_mileage_difference: 25000
+  max_radius_miles: 100
+  min_similarity_score: 0.60
+  min_comparables: 5          # below this the internal check is not computed at all
+  trim_outliers_at_count: 8   # decile trimming enabled once this many survive
+  trim_fraction: 0.10
+
+# Adjustments normalizing a comparable to subject-equivalence.
+# Sign convention: a comparable with MORE miles than the subject adjusts UPWARD.
+normalization:
+  mileage_rate_per_mile: 0.08
+  year_value: 750.0
+  trim_delta:
+    BASE: 0
+    L: 0
+    LE: 500
+    SE: 900
+    XLE: 1400
+    XSE: 1700
+    LIMITED: 2600
+    PLATINUM: 3400
+    UNKNOWN: 0
+  condition_delta:
+    EXCELLENT: 600
+    GOOD: 0
+    FAIR: -900
+    POOR: -2200
+    UNKNOWN: 0
+
+weighting:
+  recency_half_life_days: 21
+  proximity_half_life_miles: 40
+
+# D5 reconciliation. Divergence = |internal - external| / external.
+reconciliation:
+  variance_threshold_medium: 0.05
+  variance_threshold_high: 0.10
+  widen_range_above: 0.10       # range widens to contain both estimates above this
+  fallback_band_pct: 0.04       # used only when the provider supplies no range
+
+confidence:
+  weights:
+    comparable_count: 25
+    price_dispersion: 25
+    source_agreement: 25
+    mean_distance: 15
+    data_freshness: 10
+  full_credit:
+    comparable_count: 12
+    price_dispersion_cv: 0.08
+    source_divergence: 0.03
+    mean_distance_miles: 25
+    data_age_hours: 6
+  level_thresholds:
+    HIGH: 75
+    MEDIUM: 50

@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pricing-demo.local/schemas/common-types.schema.json",
+  "title": "Common Types",
+  "description": "Shared primitives. Deviation B1 from product-spec.md §24: an 18th schema beyond the 17 listed, because percentile sets, money, and simulation references are used by most other schemas. See docs/open-questions.md B.",
+
+  "$defs": {
+    "money": {
+      "type": "number",
+      "description": "USD. Never defaulted to zero when unknown; use null."
+    },
+
+    "unit": {
+      "enum": ["USD", "DAYS", "UNITS", "RATIO", "PERCENT", "USD_PER_DAY"]
+    },
+
+    "confidenceLevel": {
+      "enum": ["HIGH", "MEDIUM", "LOW", "UNKNOWN"]
+    },
+
+    "confidence": {
+      "type": "object",
+      "description": "Contributing factors are reported individually so the user can see which input is weak, not just the total.",
+      "properties": {
+        "level": { "$ref": "#/$defs/confidenceLevel" },
+        "score": { "type": "number", "minimum": 0, "maximum": 100 },
+        "factors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "contribution": { "type": "number" },
+              "note": { "type": "string" }
+            },
+            "required": ["name", "contribution"]
+          }
+        }
+      },
+      "required": ["level", "score", "factors"]
+    },
+
+    "percentileSet": {
+      "type": "object",
+      "description": "Implements D1 and D2. Percentiles are taken on this quantity's OWN distribution (convention OWN_DISTRIBUTION_V1). Risk direction per quantity is normative in docs/forecast-definitions.md §1.1. simulation_id identifies the draw matrix this was summarized from; two percentile sets may be combined arithmetically only when their simulation_id values match (§12.5).",
+      "properties": {
+        "p10": { "type": "number" },
+        "p25": { "type": "number" },
+        "p50": { "type": "number" },
+        "p75": { "type": "number" },
+        "p90": { "type": "number" },
+        "mean": { "type": "number" },
+        "unit": { "$ref": "#/$defs/unit" },
+        "simulation_id": { "type": "string" },
+        "censored_above": {
+          "type": ["number", "null"],
+          "description": "Simulation horizon. Percentiles at or above this are censored, not extrapolated (docs/forecast-definitions.md §3.4)."
+        },
+        "censored_fraction": { "type": "number", "minimum": 0, "maximum": 1 }
+      },
+      "required": ["p10", "p50", "p90", "mean", "unit", "simulation_id"],
+      "additionalProperties": false
+    },
+
+    "simulationRef": {
+      "type": "object",
+      "description": "Reproducibility stamp. Given identical inputs and versions, output is byte-identical.",
+      "properties": {
+        "simulation_id": { "type": "string" },
+        "seed": { "type": "integer" },
+        "draw_count": { "type": "integer", "minimum": 1 },
+        "horizon_days": { "type": "integer" },
+        "model_label": {
+          "const": "CONFIGURABLE_PROTOTYPE_SIMULATION",
+          "description": "product-spec.md §16.2. Must not be represented as a trained production prediction."
+        },
+        "model_version": { "type": "string" },
+        "assumption_version": { "type": "string" }
+      },
+      "required": ["simulation_id", "seed", "draw_count", "model_label", "model_version", "assumption_version"],
+      "additionalProperties": false
+    },
+
+    "sourceMeta": {
+      "type": "object",
+      "description": "Provenance envelope. Required by §21 freshness checks and §23 audit.",
+      "properties": {
+        "source": { "enum": ["VAUTO", "INTERNAL_COST", "INTERNAL_CAPACITY", "INTERNAL_EVENT", "INTERNAL_POLICY", "CONFIG", "USER"] },
+        "data_timestamp": { "type": "string", "format": "date-time" },
+        "source_version": { "type": "string" },
+        "confidence": { "$ref": "#/$defs/confidenceLevel" },
+        "coverage": { "type": "number", "minimum": 0, "maximum": 1 },
+        "freshness_class": { "enum": ["REALTIME", "NEAR_REALTIME", "DAILY", "VERSIONED"] },
+        "is_stale": { "type": "boolean" }
+      },
+      "required": ["source", "data_timestamp", "source_version"]
+    },
+
+    "fieldProvenance": {
+      "type": "object",
+      "description": "Per-field origin, per §13.3. A value the agent inferred rather than read is ESTIMATED and raises INSUFFICIENT_VEHICLE_DATA when it feeds a floor calculation.",
+      "properties": {
+        "field": { "type": "string" },
+        "source": { "enum": ["USER_STATED", "MCP", "CONFIG", "ESTIMATED", "MISSING"] },
+        "confidence": { "$ref": "#/$defs/confidenceLevel" },
+        "note": { "type": "string" }
+      },
+      "required": ["field", "source"]
+    },
+
+    "dealRating": {
+      "enum": ["GREAT", "GOOD", "FAIR", "HIGH", "NO_RATING"]
+    },
+
+    "strategy": {
+      "enum": ["MAXIMIZE_GROSS", "BALANCED", "INCREASE_VELOCITY"]
+    },
+
+    "segment": {
+      "enum": ["SEDAN", "SUV", "TRUCK", "LUXURY", "EV", "VAN", "UNKNOWN"]
+    },
+
+    "powertrain": {
+      "enum": ["ICE", "HYBRID", "PHEV", "BEV", "UNKNOWN"]
+    },
+
+    "condition": {
+      "enum": ["EXCELLENT", "GOOD", "FAIR", "POOR", "UNKNOWN"]
+    },
+
+    "explanationInputs": {
+      "type": "object",
+      "description": "The narration allow-list (docs/architecture.md §3.4). The explanation layer receives ONLY these values. A currency figure or duration in generated narrative that does not appear here fails the response rather than reaching the user. This is what enforces §4.1 at the output boundary.",
+      "properties": {
+        "values": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": { "type": "string" },
+              "value": { "type": ["number", "string", "null"] },
+              "unit": { "$ref": "#/$defs/unit" },
+              "risk_direction": {
+                "enum": ["UPSIDE_IS_P90", "UPSIDE_IS_P10", "NOT_DISTRIBUTIONAL"],
+                "description": "Prevents a narrative quoting the optimistic tail of a loss-bearing quantity."
+              }
+            },
+            "required": ["label", "value"]
+          }
+        },
+        "narratable_warning_codes": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "required": ["values"]
+    }
+  }
+}

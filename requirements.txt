@@ -1,0 +1,20 @@
+# Internal Used Vehicle Pricing and Inventory Optimization Agent
+# Prototype dependencies.
+
+# Schema validation (scripts/validate_schemas.py, §28 step 9)
+jsonschema>=4.21
+referencing>=0.33
+
+# Config
+PyYAML>=6.0
+
+# Deterministic and simulation layers
+numpy>=1.26
+pandas>=2.2
+
+# UI (not built until §28 step 10 preconditions are met)
+streamlit>=1.33
+plotly>=5.20
+
+# Tests
+pytest>=8.0

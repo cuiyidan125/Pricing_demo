@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pricing-demo.local/schemas/promotion-plan-result.schema.json",
+  "title": "Promotion Plan Result",
+  "description": "product-spec.md §15.10.",
+  "type": "object",
+
+  "properties": {
+    "promotion_objective": { "$ref": "promotion-objective.schema.json" },
+
+    "inventory_target_calculation": {
+      "type": "object",
+      "description": "§15.4, with D6 applied. Utilization is measured against total_physical_slots, and only confirmed_inbound enters the flow -- reserved_slots is a superset of it, so counting both would inflate the promotional target by the entire inbound volume.",
+      "properties": {
+        "total_physical_slots": { "type": "integer" },
+        "target_utilization": { "type": "number" },
+        "target_ending_inventory": { "type": "integer" },
+        "current_inventory": { "type": "integer" },
+        "confirmed_inbound": { "type": "integer" },
+        "reserved_not_inbound": { "type": "integer" },
+        "baseline_expected_sales": {
+          "$ref": "common-types.schema.json#/$defs/percentileSet",
+          "description": "A distribution, not a number: P50 units sold in the event window under the no-promotion baseline."
+        },
+        "other_expected_exits": {
+          "type": "integer",
+          "description": "Assumed zero in the MVP -- no data source (docs/open-questions.md C1). Because it enters with a negative sign, assuming zero makes the requirement a conservative overestimate."
+        },
+        "projected_inventory_without_promotion": { "$ref": "common-types.schema.json#/$defs/percentileSet" },
+        "incremental_promotional_sales_required": { "type": "integer" }
+      },
+      "required": [
+        "total_physical_slots", "target_utilization", "target_ending_inventory",
+        "current_inventory", "confirmed_inbound", "reserved_not_inbound",
+        "baseline_expected_sales", "incremental_promotional_sales_required"
+      ]
+    },
+
+    "feasibility": {
+      "type": "object",
+      "description": "§15.9. When the target is not achievable, the alternatives are quantified -- how many additional days, how many percentage points, how many dollars. Returning 'not achievable' without them would leave the merchandising manager exactly where they started.",
+      "properties": {
+        "status": { "enum": ["ACHIEVABLE", "ACHIEVABLE_WITH_MARGIN_COST", "AT_RISK", "NOT_ACHIEVABLE"] },
+        "required_incremental_units": { "type": "integer" },
+        "max_safe_candidate_pool": { "type": "integer" },
+        "p50_achievable_incremental_units": { "type": "number" },
+        "conservative_achievable_units": {
+          "type": "number",
+          "description": "P10 incremental units under CAPACITY_FIRST."
+        },
+        "event_duration_days": { "type": "integer" },
+        "historical_event_lift": { "type": ["number", "null"] },
+        "lift_source": { "enum": ["HISTORICAL", "CONFIG_DEFAULT"] },
+        "probability_target_achieved": { "type": "number", "minimum": 0, "maximum": 1 },
+        "alternatives": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "option": {
+                "enum": ["LONGER_CAMPAIGN", "REVISED_UTILIZATION_TARGET", "ADDITIONAL_BUDGET",
+                         "WHOLESALE_DISPOSITION", "REDUCED_INBOUND", "LOSS_MINIMIZATION"]
+              },
+              "quantified_change": { "type": "number" },
+              "unit": { "$ref": "common-types.schema.json#/$defs/unit" },
+              "resulting_probability_target_achieved": { "type": "number" }
+            },
+            "required": ["option", "quantified_change", "unit"]
+          }
+        }
+      },
+      "required": [
+        "status", "required_incremental_units", "max_safe_candidate_pool",
+        "p50_achievable_incremental_units", "conservative_achievable_units",
+        "event_duration_days", "lift_source", "probability_target_achieved"
+      ]
+    },
+
+    "candidate_ranking": { "type": "array", "items": { "$ref": "promotion-candidate.schema.json" } },
+    "excluded_vehicles": { "type": "array", "items": { "$ref": "promotion-candidate.schema.json" } },
+
+    "plans": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": { "$ref": "promotion-plan.schema.json" }
+    },
+
+    "recommended_plan": {
+      "type": "object",
+      "properties": {
+        "plan_id": { "type": "string" },
+        "plan_type": { "enum": ["MARGIN_PROTECT", "BALANCED", "CAPACITY_FIRST"] },
+        "rationale_codes": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["plan_id", "plan_type", "rationale_codes"]
+    },
+
+    "per_vehicle_actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "vehicle_id": { "type": "string" },
+          "action": { "enum": ["PROMOTE", "PROTECT_PRICE", "EXCLUDE", "MANAGER_REVIEW"] },
+          "promotion_price": { "type": ["number", "null"] },
+          "reason": { "type": "string" }
+        },
+        "required": ["vehicle_id", "action", "reason"]
+      }
+    },
+
+    "projected_ending_inventory": { "$ref": "common-types.schema.json#/$defs/percentileSet" },
+
+    "financial_impact": {
+      "type": "object",
+      "properties": {
+        "total_dealer_funded_discount": { "$ref": "common-types.schema.json#/$defs/money" },
+        "total_partner_funded_incentive": { "$ref": "common-types.schema.json#/$defs/money" },
+        "gross_impact": { "$ref": "common-types.schema.json#/$defs/percentileSet" },
+        "net_economic_value_impact": { "$ref": "common-types.schema.json#/$defs/percentileSet" },
+        "cash_holding_cost_savings": { "$ref": "common-types.schema.json#/$defs/percentileSet" },
+        "depreciation_savings": { "$ref": "common-types.schema.json#/$defs/percentileSet" }
+      },
+      "required": ["total_dealer_funded_discount", "gross_impact"]
+    },
+
+    "warnings": { "type": "array", "items": { "$ref": "warning.schema.json" } },
+    "approvals_required": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "approval_type": { "type": "string" },
+          "trigger": { "type": "string" },
+          "observed": { "type": ["number", "null"] },
+          "threshold": { "type": ["number", "null"] }
+        },
+        "required": ["approval_type", "trigger"]
+      }
+    },
+
+    "explanation_inputs": { "$ref": "common-types.schema.json#/$defs/explanationInputs" },
+    "audit": { "$ref": "audit-metadata.schema.json" }
+  },
+
+  "required": [
+    "promotion_objective", "inventory_target_calculation", "feasibility",
+    "candidate_ranking", "excluded_vehicles", "plans", "recommended_plan",
+    "per_vehicle_actions", "projected_ending_inventory", "financial_impact",
+    "warnings", "approvals_required", "explanation_inputs", "audit"
+  ]
+}

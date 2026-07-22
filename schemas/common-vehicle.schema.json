@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pricing-demo.local/schemas/common-vehicle.schema.json",
+  "title": "Common Vehicle",
+  "description": "Vehicle identity and inventory state, shared by all three skills. product-spec.md §9.1, §13.3.",
+  "type": "object",
+
+  "properties": {
+    "vehicle_id": { "type": "string" },
+    "vin": {
+      "type": ["string", "null"],
+      "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+      "description": "17 characters, excluding I, O, Q."
+    },
+    "stock_number": { "type": ["string", "null"] },
+
+    "year": { "type": "integer", "minimum": 1980, "maximum": 2100 },
+    "make": { "type": "string" },
+    "model": { "type": "string" },
+    "trim": { "type": ["string", "null"] },
+    "mileage": { "type": "integer", "minimum": 0 },
+
+    "segment": {
+      "$ref": "common-types.schema.json#/$defs/segment",
+      "description": "Addition to §9.1. Required by the depreciation model and not derivable from the fields §9.1 lists."
+    },
+    "powertrain": {
+      "$ref": "common-types.schema.json#/$defs/powertrain",
+      "description": "Addition to §9.1. Required by §18 depreciation."
+    },
+    "condition": { "$ref": "common-types.schema.json#/$defs/condition" },
+    "exterior_color": { "type": ["string", "null"] },
+    "drivetrain": { "type": ["string", "null"] },
+    "certified": { "type": ["boolean", "null"] },
+    "accident_history": { "type": ["boolean", "null"] },
+    "title_status": { "enum": ["CLEAN", "SALVAGE", "REBUILT", "LEMON", "UNKNOWN", null] },
+    "optional_equipment": { "type": "array", "items": { "type": "string" } },
+
+    "current_list_price": {
+      "type": ["number", "null"],
+      "description": "null means not yet priced. Never zero."
+    },
+    "original_list_price": { "type": ["number", "null"] },
+    "days_in_inventory": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Measured from acquisition, not merchandising start. Holding cost accrues from acquisition; market exposure begins at merchandising."
+    },
+    "acquisition_date": { "type": ["string", "null"], "format": "date" },
+    "merchandising_start_date": { "type": ["string", "null"], "format": "date" },
+    "status": { "enum": ["ACTIVE", "PENDING", "SOLD", "WHOLESALE", "IN_RECON"] },
+
+    "campaign_participation": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Active campaign ids. Drives the §15.6 exclusion."
+    }
+  },
+
+  "required": ["vehicle_id", "year", "make", "model", "mileage", "days_in_inventory", "status"]
+}

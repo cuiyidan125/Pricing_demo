@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pricing-demo.local/schemas/promotion-objective.schema.json",
+  "title": "Promotion Objective",
+  "description": "product-spec.md §15.3. The agent must resolve exact dates through the event calendar or explicit user input (§15.2) -- relative phrasing like 'starting in two days' is never carried forward unresolved.",
+  "type": "object",
+
+  "properties": {
+    "request_id": { "type": "string" },
+    "dealer_id": { "type": "string" },
+    "user_id": { "type": "string" },
+    "as_of": { "type": "string", "format": "date-time" },
+
+    "event": {
+      "type": "object",
+      "properties": {
+        "event_id": { "type": ["string", "null"] },
+        "event_name": { "type": "string" },
+        "start_date": { "type": "string", "format": "date" },
+        "end_date": { "type": "string", "format": "date" },
+        "event_type": { "type": ["string", "null"] },
+        "date_source": {
+          "enum": ["EVENT_CALENDAR", "USER_STATED"],
+          "description": "Records how the dates were resolved, per §15.2."
+        }
+      },
+      "required": ["event_name", "start_date", "end_date", "date_source"],
+      "additionalProperties": false
+    },
+
+    "target": {
+      "type": "object",
+      "properties": {
+        "target_inventory_utilization": { "type": ["number", "null"], "minimum": 0, "maximum": 1.5 },
+        "target_ending_inventory": { "type": ["integer", "null"] },
+        "optimization_priority": {
+          "enum": ["MARGIN", "BALANCED", "CAPACITY"],
+          "default": "BALANCED"
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "constraints": {
+      "type": "object",
+      "properties": {
+        "max_discount_budget": { "type": ["number", "null"] },
+        "minimum_gross_target": { "type": ["number", "null"] },
+        "excluded_vehicle_ids": { "type": "array", "items": { "type": "string" } },
+        "excluded_segments": { "type": "array", "items": { "$ref": "common-types.schema.json#/$defs/segment" } },
+        "approval_policy": {
+          "enum": ["STANDARD", "PRE_APPROVED_BUDGET", "REQUIRE_MANAGER_ALL"],
+          "default": "STANDARD"
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "extraction_provenance": {
+      "type": "array",
+      "items": { "$ref": "common-types.schema.json#/$defs/fieldProvenance" }
+    }
+  },
+
+  "required": ["request_id", "dealer_id", "user_id", "as_of", "event", "target"],
+  "additionalProperties": false
+}

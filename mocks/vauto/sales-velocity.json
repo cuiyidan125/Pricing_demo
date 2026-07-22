@@ -1,0 +1,22 @@
+{
+  "data": {
+    "market_radius_miles": 100,
+    "by_segment": {
+      "SUV":    { "avg_days_to_sale": 41, "median_days_to_sale": 36, "sales_volume": 412, "active_supply": 980,  "supply_to_sales_ratio": 2.38, "confidence": "HIGH" },
+      "SEDAN":  { "avg_days_to_sale": 47, "median_days_to_sale": 42, "sales_volume": 388, "active_supply": 1140, "supply_to_sales_ratio": 2.94, "confidence": "HIGH" },
+      "TRUCK":  { "avg_days_to_sale": 38, "median_days_to_sale": 33, "sales_volume": 296, "active_supply": 620,  "supply_to_sales_ratio": 2.09, "confidence": "MEDIUM" },
+      "LUXURY": { "avg_days_to_sale": 63, "median_days_to_sale": 55, "sales_volume": 104, "active_supply": 470,  "supply_to_sales_ratio": 4.52, "confidence": "MEDIUM" },
+      "EV":     { "avg_days_to_sale": 78, "median_days_to_sale": 68, "sales_volume": 61,  "active_supply": 340,  "supply_to_sales_ratio": 5.57, "confidence": "LOW" }
+    },
+    "seasonal_indicators": { "current_month": 7, "month_index": 1.03, "trend": "STABLE" },
+    "_note_luxury_ev": "LUXURY and EV carry high supply-to-sales ratios and long medians. Combined with the EV depreciation rate in config/assumptions/depreciation.yaml, V-10005 and V-10006 reach the aging and depreciation warnings without needing contrived inputs."
+  },
+  "meta": {
+    "source": "VAUTO",
+    "data_timestamp": "2026-07-21T08:00:00Z",
+    "source_version": "vauto-mcp-mock-0.1.0",
+    "confidence": "MEDIUM",
+    "coverage": 1.0,
+    "freshness_class": "DAILY"
+  }
+}

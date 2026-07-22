@@ -1,0 +1,24 @@
+{
+  "data": {
+    "observation_window_days": 30,
+    "engagement": {
+      "V-10001": { "listing_views": 840, "vdp_views": 312, "saved_vehicles": 21, "leads": 9,  "calls": 4, "appointments": 3 },
+      "V-10002": { "listing_views": 402, "vdp_views": 118, "saved_vehicles": 6,  "leads": 2,  "calls": 1, "appointments": 0 },
+      "V-10003": { "listing_views": 690, "vdp_views": 244, "saved_vehicles": 15, "leads": 7,  "calls": 3, "appointments": 2 },
+      "V-10004": { "listing_views": 288, "vdp_views": 74,  "saved_vehicles": 3,  "leads": 1,  "calls": 0, "appointments": 0 },
+      "V-10005": { "listing_views": 196, "vdp_views": 51,  "saved_vehicles": 2,  "leads": 1,  "calls": 0, "appointments": 0 },
+      "V-10007": { "listing_views": 795, "vdp_views": 290, "saved_vehicles": 18, "leads": 8,  "calls": 3, "appointments": 2 },
+      "V-10008": { "listing_views": 612, "vdp_views": 208, "saved_vehicles": 14, "leads": 6,  "calls": 2, "appointments": 2 },
+      "V-10012": { "listing_views": 241, "vdp_views": 63,  "saved_vehicles": 2,  "leads": 0,  "calls": 0, "appointments": 0 }
+    },
+    "_note_missing": "V-10006, V-10009, V-10010, and V-10011 are deliberately absent. §9.8 requires the agent to continue with reduced confidence when engagement is unavailable, and the hazard model must drop the engagement term rather than substituting a default. No downstream calculation may require this tool -- it is the least likely of the nine vAuto tools to exist in the assumed form."
+  },
+  "meta": {
+    "source": "VAUTO",
+    "data_timestamp": "2026-07-21T07:30:00Z",
+    "source_version": "vauto-mcp-mock-0.1.0",
+    "confidence": "LOW",
+    "coverage": 0.67,
+    "freshness_class": "DAILY"
+  }
+}

@@ -1,0 +1,15 @@
+# Version stamps recorded in every audit record (product-spec.md §23).
+# Any change to a value in config/assumptions/ requires bumping assumption_version.
+
+config_version: "0.1.0"
+assumption_version: "assumptions-2026-07-21"
+model_version: "prototype-sim-0.1.0"
+
+# product-spec.md §16.2 requires this label on every forecast output.
+model_label: "CONFIGURABLE_PROTOTYPE_SIMULATION"
+
+# Displayed in the UI per §27 item 13.
+disclaimer: >
+  Every value in config/assumptions/ is a prototype assumption, not a calibrated or fitted
+  parameter. Forecasts are configured simulations, not trained predictions. See
+  docs/open-questions.md section C for the assumptions that most affect results.

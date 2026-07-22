@@ -1,0 +1,42 @@
+# Depreciation. product-spec.md §18.
+#
+#   future_market_value = current_market_value * (1 - monthly_rate) ^ (days_to_sale / 30)
+#
+# Applied per draw, so depreciation is consistent with that draw's days to sale (D2).
+# All rates are prototype assumptions (docs/open-questions.md C2).
+
+default_monthly_rate: 0.015
+
+by_segment:
+  SEDAN: 0.014
+  SUV: 0.013
+  TRUCK: 0.011
+  LUXURY: 0.019
+  EV: 0.026          # fastest-depreciating segment in the prototype dataset
+  VAN: 0.013
+
+# Multiplicative adjustments to the segment rate.
+powertrain_multiplier:
+  ICE: 1.00
+  HYBRID: 0.95
+  PHEV: 1.15
+  BEV: 1.45
+
+vehicle_age_multiplier:
+  # Newer vehicles lose value faster in absolute and relative terms.
+  under_2_years: 1.30
+  under_4_years: 1.10
+  under_7_years: 1.00
+  over_7_years: 0.80
+
+mileage_multiplier:
+  under_30000: 1.15
+  under_60000: 1.00
+  under_100000: 0.90
+  over_100000: 0.80
+
+# Market trend applies uniformly; a stand-in for a wholesale index.
+market_trend_multiplier: 1.00
+
+# Wholesale disposition value, used by portfolio actions (open-questions.md C1).
+wholesale_value_pct_of_market: 0.86

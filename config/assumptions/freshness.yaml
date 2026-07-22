@@ -1,0 +1,48 @@
+# Data freshness policy. product-spec.md §21.
+# All checks use the injected as_of timestamp, never the wall clock (D8).
+
+classes:
+  REALTIME:
+    max_age_hours: 1
+    on_stale:
+      warning: "STALE_MARKET_DATA"
+      severity: "HIGH"
+      blocks_publication: true
+  NEAR_REALTIME:
+    max_age_hours: 4
+    on_stale:
+      warning: "STALE_MARKET_DATA"
+      severity: "MEDIUM"
+      blocks_publication: false
+      reduce_confidence: true
+  DAILY:
+    max_age_hours: 24
+    on_stale:
+      warning: "STALE_MARKET_DATA"
+      severity: "MEDIUM"
+      blocks_publication: false
+      reduce_confidence: true
+  VERSIONED:
+    max_age_hours: null
+    on_stale: null
+
+tool_classes:
+  get_dealer_inventory: REALTIME
+  get_vehicle_inventory_age: REALTIME
+  get_dealer_capacity: NEAR_REALTIME
+  get_inbound_inventory: NEAR_REALTIME
+  get_vehicle_market_position: DAILY
+  get_vehicle_comparables: DAILY
+  get_vehicle_pricing_recommendation: DAILY
+  get_vehicle_price_history: DAILY
+  get_market_sales_velocity: DAILY
+  get_shopper_engagement: DAILY
+  get_vehicle_cost_basis: DAILY
+  get_sales_event_calendar: DAILY
+  get_dealer_pricing_policy: DAILY
+  get_dealer_sales_history: VERSIONED
+
+# Stale data degrades analysis but blocks only publication. Exploring options with
+# two-hour-old inventory data is reasonable; publishing a price from it is not.
+publication_gate:
+  block_on_stale_classes: ["REALTIME"]

@@ -1,0 +1,52 @@
+# Portfolio forecasting and risk ranking. See docs/portfolio-forecast-methodology.md.
+
+horizons:
+  one_month_days: 30
+  three_month_days: 90
+
+aging_buckets:          # §14.4
+  - [0, 30]
+  - [31, 60]
+  - [61, 90]
+  - [91, 120]
+  - [121, 99999]
+
+capacity:
+  default_target_utilization: 0.85
+  # D6: utilization is always measured against total_physical_slots.
+  utilization_basis: "TOTAL_PHYSICAL_SLOTS"
+
+# §14.7.2 risk ranking. Weights are configured, not fitted.
+risk_weights:
+  prob_age_over_90: 0.22
+  p90_depreciation_loss: 0.20
+  p90_cash_holding_cost: 0.12
+  prob_negative_net_value: 0.22
+  break_even_exceeds_market: 0.10
+  cost_basis: 0.14        # so dollars at stake, not just risk, drives attention
+
+top_risk_vehicle_count: 10
+top_contributor_count: 10
+
+# Portfolio action decision table thresholds (§14.8). Evaluated in order, first match wins.
+actions:
+  wholesale_age_threshold_days: 120
+  loss_minimization_age_threshold_days: 90
+  velocity_reprice_prob_age_over_90: 0.55
+  overpriced_ratio: 1.03           # price-to-market above this
+  underpriced_ratio: 0.95
+  fast_sale_prob_30_days: 0.60     # for INCREASE_PRICE
+
+# Warning thresholds (§20.3)
+thresholds:
+  high_aged_concentration_pct: 0.25      # share of units over 90 days
+  high_projected_depreciation_pct: 0.04  # of portfolio market value over the horizon
+  high_portfolio_holding_cost_pct: 0.02  # of portfolio cost basis over the horizon
+  high_pct_below_break_even: 0.10        # share of units priced below break-even
+  low_forecast_confidence_coverage: 0.80 # data coverage below this reduces confidence
+
+# Run-off forecast (§14.6). This is the MVP default path, not an edge case:
+# no MCP tool supplies planned acquisitions.
+run_off:
+  assume_no_acquisitions: true
+  label_as_lower_bound: true

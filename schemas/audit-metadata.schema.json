@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pricing-demo.local/schemas/audit-metadata.schema.json",
+  "title": "Audit Metadata",
+  "description": "product-spec.md §23. Every result must preserve this. Version stamps matter as much as the decision: an approval granted under one set of assumptions is not evidence about a recommendation produced under different ones, and without version stamps the two are indistinguishable after the fact.",
+  "type": "object",
+
+  "properties": {
+    "request_id": { "type": "string" },
+    "dealer_id": { "type": "string" },
+    "user_id": { "type": "string" },
+
+    "input_text": {
+      "type": ["string", "null"],
+      "description": "The original natural-language request, preserved verbatim."
+    },
+    "normalized_request": {
+      "type": ["object", "null"],
+      "description": "The validated JSON produced from input_text (§4.2)."
+    },
+    "vehicle_identifiers": { "type": "array", "items": { "type": "string" } },
+
+    "mcp_tools_called": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "tool": { "type": "string" },
+          "called_at": { "type": "string", "format": "date-time" },
+          "source_version": { "type": "string" },
+          "data_timestamp": { "type": "string", "format": "date-time" },
+          "coverage": { "type": "number" },
+          "status": { "enum": ["OK", "NOT_FOUND", "UNAUTHORIZED", "UNAVAILABLE", "PARTIAL"] }
+        },
+        "required": ["tool", "called_at", "status"]
+      }
+    },
+
+    "as_of": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Injected clock (D8). Nothing in domain, simulation, or policy reads the wall clock."
+    },
+
+    "config_version": { "type": "string" },
+    "assumption_version": { "type": "string" },
+    "model_versions": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "simulation": { "$ref": "common-types.schema.json#/$defs/simulationRef" },
+
+    "percentile_convention": {
+      "const": "OWN_DISTRIBUTION_V1",
+      "description": "D1. Every percentile is taken on its own quantity's distribution. Risk direction per quantity is in docs/forecast-definitions.md §1.1."
+    },
+
+    "valuation_source": {
+      "type": "object",
+      "description": "D5 provenance: which source anchored the number, and whether the internal check ran.",
+      "properties": {
+        "anchor": { "enum": ["EXTERNAL", "INTERNAL_FALLBACK"] },
+        "internal_check_computed": { "type": "boolean" },
+        "divergence": { "type": ["number", "null"] },
+        "provider_thresholds_used": { "type": "boolean" }
+      },
+      "required": ["anchor", "internal_check_computed"]
+    },
+
+    "system_recommendation": { "type": ["number", "null"] },
+    "selected_action": { "type": ["string", "null"] },
+    "user_selected_price": { "type": ["number", "null"] },
+    "override_reason": { "type": ["string", "null"] },
+    "warning_codes": { "type": "array", "items": { "type": "string" } },
+
+    "approving_manager": { "type": ["string", "null"] },
+    "approval_id": { "type": ["string", "null"] },
+    "final_price": { "type": ["number", "null"] },
+
+    "created_at": { "type": "string", "format": "date-time" },
+    "published_at": { "type": ["string", "null"], "format": "date-time" }
+  },
+
+  "required": [
+    "request_id", "dealer_id", "user_id", "as_of",
+    "config_version", "assumption_version", "percentile_convention",
+    "mcp_tools_called", "created_at"
+  ]
+}

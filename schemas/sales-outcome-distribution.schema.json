@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pricing-demo.local/schemas/sales-outcome-distribution.schema.json",
+  "title": "Sales Outcome Distribution",
+  "description": "product-spec.md §13.6. Implements D1 and D2. Every percentile set here shares one simulation_id, so the reported figures are jointly consistent. Marginals from this object must never be combined arithmetically to synthesize a new figure (§12.5) -- compute per draw instead.",
+  "type": "object",
+
+  "properties": {
+    "simulation": { "$ref": "common-types.schema.json#/$defs/simulationRef" },
+
+    "additional_days_to_sale": {
+      "$ref": "common-types.schema.json#/$defs/percentileSet",
+      "description": "Days from as_of until sale. Downside tail is P90. Draws not selling within horizon_days are censored, not extrapolated."
+    },
+
+    "projected_total_inventory_age": {
+      "$ref": "common-types.schema.json#/$defs/percentileSet",
+      "description": "days_in_inventory + additional_days_to_sale, computed per draw. The §20.2 age warnings evaluate against this, not against additional_days_to_sale. Downside tail is P90."
+    },
+
+    "transaction_price": {
+      "$ref": "common-types.schema.json#/$defs/percentileSet",
+      "description": "Downside tail is P10, per §12.4 and the risk-direction table."
+    },
+
+    "sale_probabilities": {
+      "type": "object",
+      "description": "Direct draw counts, not normal approximations. The underlying distribution is skewed and bounded.",
+      "properties": {
+        "within_7_days": { "type": "number", "minimum": 0, "maximum": 1 },
+        "within_30_days": { "type": "number", "minimum": 0, "maximum": 1 },
+        "within_60_days": { "type": "number", "minimum": 0, "maximum": 1 },
+        "within_90_days": { "type": "number", "minimum": 0, "maximum": 1 }
+      },
+      "required": ["within_7_days", "within_30_days", "within_60_days", "within_90_days"],
+      "additionalProperties": false
+    },
+
+    "projected_age_exceedance": {
+      "type": "object",
+      "description": "P(projected_total_inventory_age > threshold). Drives the §20.2 age warnings.",
+      "properties": {
+        "over_60_days": { "type": "number", "minimum": 0, "maximum": 1 },
+        "over_90_days": { "type": "number", "minimum": 0, "maximum": 1 },
+        "over_120_days": { "type": "number", "minimum": 0, "maximum": 1 }
+      },
+      "required": ["over_60_days", "over_90_days", "over_120_days"],
+      "additionalProperties": false
+    },
+
+    "censoring": {
+      "type": "object",
+      "properties": {
+        "horizon_days": { "type": "integer" },
+        "censored_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Share of draws that did not sell within the horizon. A vehicle whose P90 is genuinely beyond the horizon must not report a precise-looking number."
+        }
+      },
+      "required": ["horizon_days", "censored_fraction"]
+    }
+  },
+
+  "required": [
+    "simulation",
+    "additional_days_to_sale",
+    "projected_total_inventory_age",
+    "transaction_price",
+    "sale_probabilities",
+    "projected_age_exceedance",
+    "censoring"
+  ]
+}

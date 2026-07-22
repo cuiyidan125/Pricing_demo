@@ -1,0 +1,42 @@
+# Expected discounting. Implements D4.
+#
+# This is the most consequential invented constant in the system: it sits underneath
+# minimum_safe_list_price, negotiation reserve, promotional headroom, and every promotion
+# plan. It cannot be calibrated from dealer history until get_dealer_sales_history returns
+# list_price_at_sale (added to the §9.9 contract for exactly this reason).
+#
+# Per §27 item 13 this value must be visible in the UI assumptions panel, not buried here.
+
+default_expected_discount_rate: 0.025
+
+# Segment x price band. Lookup falls back to default when no entry matches.
+by_segment:
+  SEDAN:
+    under_15000: 0.030
+    under_30000: 0.025
+    over_30000: 0.022
+  SUV:
+    under_15000: 0.032
+    under_30000: 0.026
+    over_30000: 0.023
+  TRUCK:
+    under_30000: 0.028
+    over_30000: 0.030      # higher transaction prices concede more absolute dollars
+  LUXURY:
+    under_30000: 0.030
+    over_30000: 0.035
+  EV:
+    under_30000: 0.035
+    over_30000: 0.040      # softer used-EV demand, wider negotiation
+
+price_bands:
+  under_15000: [0, 15000]
+  under_30000: [15000, 30000]
+  over_30000: [30000, 999999]
+
+# Partition of available headroom into reserves (§13.9).
+# Fractions of max_safe_discount, applied in order.
+reserves:
+  negotiation: 0.40          # ordinary desk negotiation
+  event_promotion: 0.40      # available to the promotion planner
+  emergency_markdown: 0.20   # requires manager approval (§22.2)

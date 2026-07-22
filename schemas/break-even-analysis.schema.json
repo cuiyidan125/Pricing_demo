@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pricing-demo.local/schemas/break-even-analysis.schema.json",
+  "title": "Break-Even Analysis",
+  "description": "product-spec.md §11.7-§11.11, §13.8. Implements D3 and D4. Only CASH holding cost enters these figures. Slot opportunity cost is imputed and is excluded from every field in this schema -- including it would raise the floor above the dealer's real recovery point and, because §19.1 makes the floor a publication bar, would silently block profitable sales.",
+  "type": "object",
+
+  "properties": {
+    "simulation": { "$ref": "common-types.schema.json#/$defs/simulationRef" },
+
+    "cost_components": {
+      "type": "object",
+      "properties": {
+        "acquisition_cost": { "$ref": "common-types.schema.json#/$defs/money" },
+        "auction_fee": { "$ref": "common-types.schema.json#/$defs/money" },
+        "transportation_cost": { "$ref": "common-types.schema.json#/$defs/money" },
+        "reconditioning_cost": { "$ref": "common-types.schema.json#/$defs/money" },
+        "accrued_cash_holding_cost": {
+          "$ref": "common-types.schema.json#/$defs/money",
+          "description": "Cash only (D3). Incurred to date."
+        },
+        "direct_selling_costs": { "$ref": "common-types.schema.json#/$defs/money" }
+      },
+      "required": ["acquisition_cost", "reconditioning_cost", "accrued_cash_holding_cost"]
+    },
+
+    "current_accounting_break_even": {
+      "$ref": "common-types.schema.json#/$defs/money",
+      "description": "§11.7. Costs already incurred or contractually committed as of today. No future costs, no imputed costs."
+    },
+
+    "projected_break_even": {
+      "$ref": "common-types.schema.json#/$defs/percentileSet",
+      "description": "§11.8. current_accounting_break_even + future cash holding cost through the draw's sale date, computed per draw. DOWNSIDE IS P90."
+    },
+
+    "floors": {
+      "type": "object",
+      "description": "The four inputs to §11.10. policy_price_floor and risk_floor have no MCP source in §10 and are read from config in the MVP (docs/open-questions.md C1).",
+      "properties": {
+        "hard_price_floor": { "$ref": "common-types.schema.json#/$defs/money" },
+        "policy_price_floor": { "$ref": "common-types.schema.json#/$defs/money" },
+        "financing_constraint": { "type": ["number", "null"] },
+        "risk_floor": { "$ref": "common-types.schema.json#/$defs/money" },
+        "binding_constraint": {
+          "enum": ["ACCOUNTING_BREAK_EVEN", "POLICY_FLOOR", "FINANCING", "RISK_FLOOR"],
+          "description": "Which of the four is the maximum, and therefore which one actually constrains the price."
+        }
+      },
+      "required": ["hard_price_floor", "policy_price_floor", "risk_floor", "binding_constraint"]
+    },
+
+    "minimum_safe_transaction_price": {
+      "$ref": "common-types.schema.json#/$defs/money",
+      "description": "§11.10. Maximum of the four floors."
+    },
+
+    "minimum_safe_list_price": {
+      "$ref": "common-types.schema.json#/$defs/money",
+      "description": "§11.11. minimum_safe_transaction_price / (1 - expected_discount_rate). A vehicle listed exactly at its minimum safe transaction price transacts BELOW it after normal negotiation."
+    },
+
+    "expected_discount_rate_used": {
+      "type": "number",
+      "description": "D4. A configured assumption, not a calibrated value. Must be surfaced in the UI assumptions panel."
+    },
+
+    "probability_of_loss": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "P(transaction_price < current_accounting_break_even) across draws."
+    },
+
+    "market_value_crossover_risk": {
+      "type": "object",
+      "description": "Whether break-even is above, or projected to rise above, market value -- the underwater condition that triggers the §19.2 loss-minimization path.",
+      "properties": {
+        "break_even_exceeds_market_value_now": { "type": "boolean" },
+        "probability_crossover_within_horizon": { "type": "number", "minimum": 0, "maximum": 1 },
+        "estimated_crossover_days": { "type": ["integer", "null"] }
+      },
+      "required": ["break_even_exceeds_market_value_now", "probability_crossover_within_horizon"]
+    }
+  },
+
+  "required": [
+    "simulation", "cost_components", "current_accounting_break_even", "projected_break_even",
+    "floors", "minimum_safe_transaction_price", "minimum_safe_list_price",
+    "expected_discount_rate_used", "probability_of_loss", "market_value_crossover_risk"
+  ]
+}

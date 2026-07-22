@@ -1,0 +1,96 @@
+# Sales outcome simulation. Implements D2.
+# product-spec.md §16.2 requires this be labeled CONFIGURABLE_PROTOTYPE_SIMULATION
+# and never represented as a trained production prediction.
+
+run:
+  draw_count: 2000
+  seed: 20260721              # fixed: scenarios, plans, and baselines share it
+  horizon_days: 365           # draws beyond this are censored, not extrapolated
+  parallel_vehicles: true     # one simulation covers the whole portfolio
+
+# --- Hazard model (docs/forecast-definitions.md §5.1) ---
+
+hazard:
+  # price_position_multiplier is the elasticity driving every velocity-vs-gross tradeoff
+  # in the product. It is assumed, not calibrated. See docs/open-questions.md C3.
+  price_position:
+    # keyed by price_to_market_ratio
+    0.90: 1.55
+    0.95: 1.28
+    1.00: 1.00
+    1.05: 0.72
+    1.10: 0.48
+    1.15: 0.30
+
+  mileage:
+    under_30000: 1.12
+    under_60000: 1.00
+    under_100000: 0.88
+    over_100000: 0.72
+
+  condition:
+    EXCELLENT: 1.10
+    GOOD: 1.00
+    FAIR: 0.85
+    POOR: 0.65
+    UNKNOWN: 0.95
+
+  supply:
+    # keyed by supply_to_sales_ratio; oversupply slows everything
+    1.0: 1.20
+    2.0: 1.00
+    3.0: 0.85
+    5.0: 0.65
+
+  engagement:
+    enabled_when_available: true
+    min_multiplier: 0.80
+    max_multiplier: 1.25
+    # Engagement is partly an effect of price rather than a cause of sale, so its
+    # influence is deliberately bounded. Absent, the term is 1.0 (§9.8).
+    neutral_multiplier: 1.00
+
+  seasonality:
+    "1": 0.92
+    "2": 1.02
+    "3": 1.15
+    "4": 1.10
+    "5": 1.05
+    "6": 1.00
+    "7": 1.03
+    "8": 0.98
+    "9": 0.95
+    "10": 0.93
+    "11": 0.90
+    "12": 0.88
+
+  dealer_performance_multiplier: 1.00
+
+  # A vehicle that has already sat is modeled as slightly harder to move.
+  aging_drift_per_30_days: -0.03
+
+# --- Transaction price per draw (docs/forecast-definitions.md §5.2) ---
+
+transaction_price:
+  discount_dispersion_sd: 0.012
+  # Negative: fast sales concede less. This correlation is why net economic value
+  # must be summarized from draws rather than assembled from marginals (§12.5).
+  speed_discount_correlation: -0.35
+  min_discount_rate: 0.0
+  max_discount_rate: 0.12
+
+# --- Event and cannibalization effects ---
+
+event:
+  default_lift_multiplier: 1.35        # used when historical lift is unavailable
+  lift_confidence_when_defaulted: "LOW"
+  max_lift_multiplier: 2.50
+
+cannibalization:
+  # Discounting one unit in a duplicate group suppresses hazard for the others.
+  cross_elasticity: 0.18
+  duplicate_rule:
+    same_model: true
+    year_tolerance: 1
+    same_trim_group: true
+    mileage_tolerance: 15000

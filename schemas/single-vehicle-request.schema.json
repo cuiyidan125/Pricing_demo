@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pricing-demo.local/schemas/single-vehicle-request.schema.json",
+  "title": "Single Vehicle Request",
+  "description": "The validated JSON the agent must produce before any tool call (§4.2, §13.3). NOTE: this schema deliberately contains no computed field -- no recommended_price, no days_to_sale, no break_even. additionalProperties is false, so there is no property for a model to populate with an invented number. This is the structural half of §4.1; the import guard in docs/architecture.md §3.2 is the other half.",
+  "type": "object",
+
+  "properties": {
+    "request_id": { "type": "string" },
+    "dealer_id": { "type": "string" },
+    "user_id": { "type": "string" },
+    "as_of": { "type": "string", "format": "date-time" },
+
+    "vehicle": {
+      "type": "object",
+      "description": "Extracted vehicle identity. Fields the agent could not read are omitted and recorded in extraction_provenance as MISSING.",
+      "properties": {
+        "vehicle_id": { "type": ["string", "null"] },
+        "vin": { "type": ["string", "null"], "pattern": "^[A-HJ-NPR-Z0-9]{17}$" },
+        "year": { "type": "integer", "minimum": 1980, "maximum": 2100 },
+        "make": { "type": "string" },
+        "model": { "type": "string" },
+        "trim": { "type": ["string", "null"] },
+        "mileage": { "type": ["integer", "null"], "minimum": 0 },
+        "condition": { "$ref": "common-types.schema.json#/$defs/condition" },
+        "segment": { "$ref": "common-types.schema.json#/$defs/segment" },
+        "powertrain": { "$ref": "common-types.schema.json#/$defs/powertrain" },
+        "drivetrain": { "type": ["string", "null"] },
+        "accident_history": { "type": ["boolean", "null"] },
+        "title_status": { "enum": ["CLEAN", "SALVAGE", "REBUILT", "LEMON", "UNKNOWN", null] },
+        "optional_equipment": { "type": "array", "items": { "type": "string" } },
+        "certified": { "type": ["boolean", "null"] }
+      },
+      "required": ["year", "make", "model"],
+      "additionalProperties": false
+    },
+
+    "dealer_context": {
+      "type": "object",
+      "properties": {
+        "postal_code": { "type": ["string", "null"] },
+        "acquisition_cost": { "type": ["number", "null"] },
+        "reconditioning_cost": { "type": ["number", "null"] },
+        "transportation_cost": { "type": ["number", "null"] },
+        "auction_fee": { "type": ["number", "null"] },
+        "current_list_price": { "type": ["number", "null"] },
+        "days_in_inventory": { "type": ["integer", "null"], "minimum": 0 },
+        "floorplan_rate": { "type": ["number", "null"] },
+        "inventory_cost_allocation": { "type": ["number", "null"] },
+        "expected_discount_rate_override": {
+          "type": ["number", "null"],
+          "description": "Optional per-dealer override of the D4 configured assumption."
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "objective": {
+      "type": "object",
+      "properties": {
+        "requested_outputs": {
+          "type": "array",
+          "items": {
+            "enum": ["VALUATION", "PRICING_SCENARIOS", "SALES_FORECAST", "BREAK_EVEN", "PROMOTIONAL_HEADROOM", "DEPRECIATION"]
+          }
+        },
+        "preferred_strategy": { "$ref": "common-types.schema.json#/$defs/strategy" }
+      },
+      "additionalProperties": false
+    },
+
+    "extraction_provenance": {
+      "type": "array",
+      "description": "One entry per extracted field (§13.3). ESTIMATED fields feeding a floor calculation raise INSUFFICIENT_VEHICLE_DATA.",
+      "items": { "$ref": "common-types.schema.json#/$defs/fieldProvenance" }
+    },
+
+    "ambiguities": {
+      "type": "array",
+      "description": "Fields the agent could not resolve and must either ask about or flag.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "field": { "type": "string" },
+          "candidates": { "type": "array", "items": { "type": "string" } },
+          "question": { "type": "string" }
+        },
+        "required": ["field"]
+      }
+    }
+  },
+
+  "required": ["request_id", "dealer_id", "user_id", "as_of", "vehicle", "extraction_provenance"],
+  "additionalProperties": false
+}

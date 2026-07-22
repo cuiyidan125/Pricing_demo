@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pricing-demo.local/schemas/promotion-candidate.schema.json",
+  "title": "Promotion Candidate",
+  "description": "product-spec.md §15.5-§15.7. Every scoring signal comes from a shared domain module; none is recomputed here (§28). Excluded candidates are retained with their reason -- a plan is not reviewable if the reader cannot see what was left out.",
+  "type": "object",
+
+  "properties": {
+    "vehicle_id": { "type": "string" },
+    "vehicle": { "$ref": "common-vehicle.schema.json" },
+
+    "eligible": { "type": "boolean" },
+    "exclusion_reason": {
+      "enum": [
+        "RECENTLY_ACQUIRED",
+        "ALREADY_STRONG_DEAL",
+        "HIGH_DEMAND_SCARCE",
+        "LIKELY_TO_SELL_BEFORE_EVENT",
+        "NO_SAFE_HEADROOM",
+        "INSUFFICIENT_DATA",
+        "ALREADY_IN_CAMPAIGN",
+        "POLICY_EXCLUDED",
+        null
+      ]
+    },
+
+    "score": { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
+    "score_components": {
+      "type": "object",
+      "description": "Individual contributions, so a merchandising manager can see why a vehicle ranked where it did.",
+      "additionalProperties": { "type": "number" }
+    },
+
+    "signals": {
+      "type": "object",
+      "properties": {
+        "days_in_inventory": { "type": "integer" },
+        "projected_total_age_p50": { "type": ["number", "null"] },
+        "projected_total_age_p90": { "type": ["number", "null"] },
+        "p90_depreciation_loss": { "type": ["number", "null"] },
+        "p90_cash_holding_cost": { "type": ["number", "null"] },
+        "price_to_market_ratio": { "type": ["number", "null"] },
+        "deal_rating": { "$ref": "common-types.schema.json#/$defs/dealRating" },
+        "shopper_engagement_available": { "type": "boolean" },
+        "slot_opportunity_cost_per_day": { "type": ["number", "null"] },
+        "duplicate_group_id": { "type": ["string", "null"] },
+        "duplicate_group_size": { "type": "integer" },
+        "has_inbound_replacement": { "type": "boolean" }
+      }
+    },
+
+    "pricing": {
+      "type": "object",
+      "properties": {
+        "current_list_price": { "$ref": "common-types.schema.json#/$defs/money" },
+        "minimum_safe_transaction_price": { "$ref": "common-types.schema.json#/$defs/money" },
+        "minimum_safe_list_price": { "$ref": "common-types.schema.json#/$defs/money" },
+        "max_accounting_discount": { "$ref": "common-types.schema.json#/$defs/money" },
+        "max_safe_discount": { "$ref": "common-types.schema.json#/$defs/money" },
+        "economically_sensible_discount": {
+          "$ref": "common-types.schema.json#/$defs/money",
+          "description": "Argmax of P50 net economic value over the simulated discount ladder. Slot opportunity cost is included here (D3) because this is an optimization, not a floor."
+        },
+        "recommended_promotion_discount": { "$ref": "common-types.schema.json#/$defs/money" },
+        "remaining_headroom": { "$ref": "common-types.schema.json#/$defs/money" }
+      },
+      "required": ["current_list_price", "minimum_safe_list_price", "max_safe_discount"]
+    },
+
+    "warnings": { "type": "array", "items": { "$ref": "warning.schema.json" } }
+  },
+
+  "required": ["vehicle_id", "eligible"],
+
+  "allOf": [
+    {
+      "description": "An ineligible candidate must say why.",
+      "if": { "properties": { "eligible": { "const": false } }, "required": ["eligible"] },
+      "then": { "properties": { "exclusion_reason": { "type": "string" } }, "required": ["exclusion_reason"] }
+    },
+    {
+      "description": "An eligible candidate must be scored and priced.",
+      "if": { "properties": { "eligible": { "const": true } }, "required": ["eligible"] },
+      "then": { "required": ["score", "pricing"] }
+    }
+  ]
+}

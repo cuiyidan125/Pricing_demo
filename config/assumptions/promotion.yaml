@@ -1,0 +1,60 @@
+# Event promotion planning. See docs/promotion-optimization-methodology.md.
+
+# §15.5 candidate scoring weights. Configured, not fitted.
+candidate_weights:
+  days_in_inventory: 0.14
+  projected_total_age_p50: 0.14
+  p90_depreciation_loss: 0.12
+  p90_cash_holding_cost: 0.08
+  price_above_market: 0.12
+  deal_rating: 0.08
+  shopper_engagement: 0.06
+  promotional_headroom: 0.10
+  slot_opportunity_cost: 0.06
+  duplicate_inventory: 0.06
+  inbound_replacement: 0.04
+
+# §15.6 exclusions, applied before scoring.
+exclusions:
+  min_promotion_age_days: 21
+  exclude_deal_rating: ["GREAT"]
+  scarcity_supply_to_sales_threshold: 1.2
+  # "Likely to sell before the event" is undefined in §15.6; this is our rule.
+  # See docs/open-questions.md C4.
+  exclude_if_p50_days_before_event_start: true
+  require_positive_safe_headroom: true
+  exclude_low_valuation_confidence: true
+  exclude_active_campaign: true
+
+# §15.7 discount ladder. economically_sensible_discount is found by re-simulating each
+# rung and taking the argmax of P50 net economic value -- not by formula.
+discount_ladder:
+  step_usd: 250
+  max_steps: 40
+
+# §15.8 plan construction
+plans:
+  MARGIN_PROTECT:
+    candidate_selection: "TOP_SCORING"
+    discount_rule: "MIN_OF_SENSIBLE_AND_HALF_SAFE"
+    safe_discount_fraction: 0.50
+  BALANCED:
+    candidate_selection: "ABOVE_MEDIAN_SCORE"
+    discount_rule: "ECONOMICALLY_SENSIBLE"
+  CAPACITY_FIRST:
+    candidate_selection: "ALL_ELIGIBLE"
+    discount_rule: "MAX_SAFE_WITHIN_BUDGET"
+
+recommended_plan_default: "BALANCED"
+
+# §15.9 feasibility bands, evaluated on P(target achieved)
+feasibility:
+  achievable_threshold: 0.70
+  at_risk_threshold: 0.30
+  evaluate_balanced_first: true
+
+# §20.4 warning thresholds
+thresholds:
+  cannibalization_units_in_group: 2       # discounting more than one triggers the warning
+  promotion_cost_vs_savings_ratio: 1.0    # cost exceeding modeled savings triggers warning
+  min_safe_candidates: 5

@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pricing-demo.local/schemas/promotional-headroom.schema.json",
+  "title": "Promotional Headroom",
+  "description": "product-spec.md §11.12, §13.9, §15.7. Headroom is the distance between the current or recommended list price and the minimum safe promotional list price, partitioned into reserves.",
+  "type": "object",
+
+  "properties": {
+    "reference_list_price": {
+      "$ref": "common-types.schema.json#/$defs/money",
+      "description": "The price headroom is measured from -- current list, or the recommended price for the selected strategy."
+    },
+    "minimum_safe_list_price": { "$ref": "common-types.schema.json#/$defs/money" },
+
+    "reserves": {
+      "type": "object",
+      "description": "Partition of max_safe_discount (config/assumptions/discounting.yaml). Emergency markdown requires manager approval per §22.2.",
+      "properties": {
+        "negotiation_reserve": { "$ref": "common-types.schema.json#/$defs/money" },
+        "event_promotion_reserve": { "$ref": "common-types.schema.json#/$defs/money" },
+        "emergency_markdown_reserve": { "$ref": "common-types.schema.json#/$defs/money" }
+      },
+      "required": ["negotiation_reserve", "event_promotion_reserve", "emergency_markdown_reserve"]
+    },
+
+    "max_accounting_discount": {
+      "$ref": "common-types.schema.json#/$defs/money",
+      "description": "Discount to the accounting break-even list equivalent."
+    },
+    "max_safe_discount": {
+      "$ref": "common-types.schema.json#/$defs/money",
+      "description": "reference_list_price - minimum_safe_list_price. Exceeding this raises a BLOCKING warning."
+    },
+    "economically_sensible_discount": {
+      "$ref": "common-types.schema.json#/$defs/money",
+      "description": "Found by re-simulating the vehicle at each rung of the discount ladder and taking the argmax of P50 net economic value -- not by formula. Slot opportunity cost IS included here (D3), because this is an economic optimization rather than a floor."
+    },
+    "recommended_promotion_discount": {
+      "$ref": "common-types.schema.json#/$defs/money",
+      "description": "min(economically_sensible, max_safe, budget_constrained)."
+    },
+
+    "used_headroom": {
+      "$ref": "common-types.schema.json#/$defs/money",
+      "description": "original_list_price - current_list_price. Cumulative markdown already taken."
+    },
+    "remaining_headroom": { "$ref": "common-types.schema.json#/$defs/money" },
+
+    "ladder": {
+      "type": "array",
+      "description": "The evaluated discount ladder, retained so the chosen rung is auditable rather than asserted.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "discount": { "$ref": "common-types.schema.json#/$defs/money" },
+          "list_price": { "$ref": "common-types.schema.json#/$defs/money" },
+          "p50_net_economic_value": { "$ref": "common-types.schema.json#/$defs/money" },
+          "p50_days_to_sale": { "type": "number" },
+          "exceeds_safe_discount": { "type": "boolean" }
+        },
+        "required": ["discount", "list_price", "p50_net_economic_value"]
+      }
+    }
+  },
+
+  "required": [
+    "reference_list_price", "minimum_safe_list_price", "reserves",
+    "max_accounting_discount", "max_safe_discount",
+    "economically_sensible_discount", "recommended_promotion_discount",
+    "used_headroom", "remaining_headroom"
+  ]
+}

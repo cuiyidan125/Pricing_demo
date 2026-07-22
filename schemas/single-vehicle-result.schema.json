@@ -1,0 +1,200 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pricing-demo.local/schemas/single-vehicle-result.schema.json",
+  "title": "Single Vehicle Result",
+  "description": "product-spec.md §13.10. All three pricing scenarios share one seed, so differences between them reflect the price change rather than sampling noise.",
+  "type": "object",
+
+  "$defs": {
+    "pricingScenario": {
+      "type": "object",
+      "description": "product-spec.md §13.5. Every distributional field here is summarized from draws in which price, days to sale, holding cost, and depreciation are jointly consistent (§12.5). expected_net_economic_value is NOT gross minus the P50 of each cost.",
+      "properties": {
+        "strategy": { "$ref": "common-types.schema.json#/$defs/strategy" },
+        "proposed_list_price": { "$ref": "common-types.schema.json#/$defs/money" },
+        "price_to_market_ratio": { "type": "number" },
+        "deal_rating": { "$ref": "common-types.schema.json#/$defs/dealRating" },
+
+        "transaction_price": { "$ref": "common-types.schema.json#/$defs/percentileSet" },
+        "additional_days_to_sale": { "$ref": "common-types.schema.json#/$defs/percentileSet" },
+        "projected_total_inventory_age": { "$ref": "common-types.schema.json#/$defs/percentileSet" },
+        "sale_probabilities": {
+          "type": "object",
+          "properties": {
+            "within_30_days": { "type": "number" },
+            "within_60_days": { "type": "number" },
+            "within_90_days": { "type": "number" }
+          },
+          "required": ["within_30_days", "within_60_days", "within_90_days"]
+        },
+
+        "expected_cash_holding_cost": {
+          "$ref": "common-types.schema.json#/$defs/percentileSet",
+          "description": "Cash only (D3). This is the figure that enters break-even."
+        },
+        "expected_slot_opportunity_cost": {
+          "$ref": "common-types.schema.json#/$defs/percentileSet",
+          "description": "Imputed (D3). Enters net economic value only, never a floor."
+        },
+        "expected_depreciation_loss": { "$ref": "common-types.schema.json#/$defs/percentileSet" },
+        "expected_front_end_gross": { "$ref": "common-types.schema.json#/$defs/percentileSet" },
+        "expected_net_economic_value": { "$ref": "common-types.schema.json#/$defs/percentileSet" },
+
+        "promotional_headroom": { "$ref": "promotional-headroom.schema.json" },
+        "warnings": { "type": "array", "items": { "$ref": "warning.schema.json" } }
+      },
+      "required": [
+        "strategy", "proposed_list_price", "price_to_market_ratio", "deal_rating",
+        "transaction_price", "additional_days_to_sale", "projected_total_inventory_age",
+        "sale_probabilities", "expected_cash_holding_cost", "expected_slot_opportunity_cost",
+        "expected_depreciation_loss", "expected_front_end_gross", "expected_net_economic_value",
+        "warnings"
+      ]
+    }
+  },
+
+  "properties": {
+    "vehicle": { "$ref": "common-vehicle.schema.json" },
+
+    "valuation": {
+      "type": "object",
+      "description": "Implements D5. market_value is always the external anchor; divergence widens the range and lowers confidence but never moves the point estimate toward the internal figure.",
+      "properties": {
+        "market_value": { "$ref": "common-types.schema.json#/$defs/money" },
+        "market_supported_range": {
+          "type": "object",
+          "properties": {
+            "low": { "$ref": "common-types.schema.json#/$defs/money" },
+            "high": { "$ref": "common-types.schema.json#/$defs/money" }
+          },
+          "required": ["low", "high"]
+        },
+        "external_estimate": { "type": ["number", "null"] },
+        "external_source_methodology": { "type": ["string", "null"] },
+        "internal_estimate": {
+          "type": ["number", "null"],
+          "description": "null when fewer than min_comparables survived. A weighted median of three listings is noise presented as a second opinion."
+        },
+        "divergence": { "type": ["number", "null"] },
+        "anchor": { "enum": ["EXTERNAL", "INTERNAL_FALLBACK"] },
+        "confidence": { "$ref": "common-types.schema.json#/$defs/confidence" }
+      },
+      "required": ["market_value", "market_supported_range", "anchor", "confidence"]
+    },
+
+    "market_position": {
+      "type": "object",
+      "properties": {
+        "current_list_price": { "type": ["number", "null"] },
+        "price_to_market_ratio": { "type": ["number", "null"] },
+        "market_percentile": { "type": ["number", "null"] },
+        "deal_rating": { "$ref": "common-types.schema.json#/$defs/dealRating" },
+        "thresholds": {
+          "type": "object",
+          "properties": {
+            "good_deal": { "type": "number" },
+            "fair_deal": { "type": "number" },
+            "poor_deal": { "type": "number" },
+            "source": { "enum": ["PROVIDER", "CONFIG_FALLBACK"] }
+          }
+        },
+        "source": { "$ref": "common-types.schema.json#/$defs/sourceMeta" }
+      },
+      "required": ["deal_rating"]
+    },
+
+    "comparables": {
+      "type": "array",
+      "description": "Both included and excluded comparables. Exclusions carry a reason: a pricing analyst cannot audit a valuation whose discarded evidence is invisible.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "listing_id": { "type": "string" },
+          "year": { "type": "integer" },
+          "make": { "type": "string" },
+          "model": { "type": "string" },
+          "trim": { "type": ["string", "null"] },
+          "mileage": { "type": "integer" },
+          "condition": { "$ref": "common-types.schema.json#/$defs/condition" },
+          "list_price": { "$ref": "common-types.schema.json#/$defs/money" },
+          "adjusted_price": {
+            "type": ["number", "null"],
+            "description": "Normalized to subject-equivalence. A comparable with MORE miles than the subject adjusts UPWARD."
+          },
+          "adjustments": {
+            "type": "object",
+            "properties": {
+              "mileage_adj": { "type": "number" },
+              "year_adj": { "type": "number" },
+              "trim_adj": { "type": "number" },
+              "condition_adj": { "type": "number" }
+            }
+          },
+          "distance_miles": { "type": "number" },
+          "days_on_market": { "type": "integer" },
+          "similarity_score": { "type": "number", "minimum": 0, "maximum": 1 },
+          "weight": { "type": ["number", "null"] },
+          "included": { "type": "boolean" },
+          "exclusion_reason": { "type": ["string", "null"] },
+          "data_timestamp": { "type": "string", "format": "date-time" }
+        },
+        "required": ["listing_id", "year", "make", "model", "mileage", "list_price", "included"]
+      }
+    },
+
+    "break_even_analysis": { "$ref": "break-even-analysis.schema.json" },
+    "promotional_headroom": { "$ref": "promotional-headroom.schema.json" },
+    "sales_outcome_distribution": { "$ref": "sales-outcome-distribution.schema.json" },
+    "depreciation_forecast": { "$ref": "depreciation-forecast.schema.json" },
+
+    "pricing_scenarios": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": { "$ref": "#/$defs/pricingScenario" }
+    },
+
+    "recommended_strategy": {
+      "type": "object",
+      "properties": {
+        "strategy": { "$ref": "common-types.schema.json#/$defs/strategy" },
+        "rationale_codes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Deterministic codes. The explanation layer renders these as prose; it does not originate them."
+        }
+      },
+      "required": ["strategy", "rationale_codes"]
+    },
+
+    "warnings": { "type": "array", "items": { "$ref": "warning.schema.json" } },
+
+    "approvals_required": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "approval_type": {
+            "enum": ["EMERGENCY_MARKDOWN", "BELOW_PROJECTED_BREAK_EVEN", "NEGATIVE_VALUE_RISK",
+                     "AGGRESSIVE_ADJUSTMENT", "LOSS_MINIMIZATION", "CAPACITY_FIRST_GROSS_REDUCTION",
+                     "PROMOTION_BUDGET_EXCEPTION"]
+          },
+          "trigger": { "type": "string" },
+          "observed": { "type": ["number", "null"] },
+          "threshold": { "type": ["number", "null"] }
+        },
+        "required": ["approval_type", "trigger"]
+      }
+    },
+
+    "explanation_inputs": { "$ref": "common-types.schema.json#/$defs/explanationInputs" },
+    "audit": { "$ref": "audit-metadata.schema.json" }
+  },
+
+  "required": [
+    "vehicle", "valuation", "market_position", "comparables",
+    "break_even_analysis", "promotional_headroom", "sales_outcome_distribution",
+    "depreciation_forecast", "pricing_scenarios", "recommended_strategy",
+    "warnings", "approvals_required", "explanation_inputs", "audit"
+  ]
+}

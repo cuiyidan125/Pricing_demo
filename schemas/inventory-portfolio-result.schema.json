@@ -1,0 +1,188 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pricing-demo.local/schemas/inventory-portfolio-result.schema.json",
+  "title": "Inventory Portfolio Result",
+  "description": "product-spec.md §14.9.",
+  "type": "object",
+
+  "properties": {
+    "dealer_context": {
+      "type": "object",
+      "properties": {
+        "dealer_id": { "type": "string" },
+        "postal_code": { "type": ["string", "null"] },
+        "as_of": { "type": "string", "format": "date-time" }
+      },
+      "required": ["dealer_id", "as_of"]
+    },
+
+    "data_coverage": {
+      "type": "object",
+      "description": "Aggregated from the per-tool coverage field. Portfolio calls routinely return partial data; completeness is never assumed.",
+      "properties": {
+        "vehicles_requested": { "type": "integer" },
+        "vehicles_analyzed": { "type": "integer" },
+        "missing_cost_basis": { "type": "integer" },
+        "missing_market_position": { "type": "integer" },
+        "missing_comparables": { "type": "integer" },
+        "coverage_ratio": { "type": "number", "minimum": 0, "maximum": 1 },
+        "stale_sources": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["vehicles_requested", "vehicles_analyzed", "coverage_ratio"]
+    },
+
+    "inventory_summary": {
+      "type": "object",
+      "properties": {
+        "active_count": { "type": "integer" },
+        "pending_count": { "type": "integer" },
+        "inbound_count": { "type": "integer" },
+        "average_days_in_inventory": { "type": "number" },
+        "median_days_in_inventory": { "type": "number" }
+      },
+      "required": ["active_count"]
+    },
+
+    "portfolio_valuation": { "$ref": "inventory-portfolio-valuation.schema.json" },
+
+    "aging_profile": {
+      "type": "object",
+      "properties": {
+        "buckets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": { "type": "string" },
+              "min_days": { "type": "integer" },
+              "max_days": { "type": "integer" },
+              "unit_count": { "type": "integer" },
+              "cost_basis": { "$ref": "common-types.schema.json#/$defs/money" },
+              "projected_unit_count_at_horizon": {
+                "type": ["integer", "null"],
+                "description": "From the draws, so 'how much of my inventory will be over 90 days in a month' is answerable rather than inferred."
+              }
+            },
+            "required": ["label", "min_days", "max_days", "unit_count"]
+          }
+        },
+        "aged_concentration_pct": { "type": "number", "minimum": 0, "maximum": 1 }
+      },
+      "required": ["buckets", "aged_concentration_pct"]
+    },
+
+    "capacity_position": {
+      "type": "object",
+      "description": "Derived fields are computed from the primitives, not returned by the MCP tool -- a returned derived field disagreeing with the primitives would be unresolvable. D6: reserved_slots is a superset of confirmed_inbound, so the two are never both deducted.",
+      "properties": {
+        "total_physical_slots": { "type": "integer" },
+        "current_inventory": { "type": "integer" },
+        "reserved_slots": { "type": "integer" },
+        "confirmed_inbound": { "type": "integer" },
+        "reserved_not_inbound": { "type": "integer" },
+        "expected_exits": { "type": "integer" },
+        "physical_open_slots": { "type": "integer" },
+        "effective_open_slots": { "type": "integer" },
+        "current_utilization": { "type": "number" },
+        "target_utilization": { "type": "number" }
+      },
+      "required": [
+        "total_physical_slots", "current_inventory", "reserved_slots",
+        "confirmed_inbound", "reserved_not_inbound", "current_utilization", "target_utilization"
+      ]
+    },
+
+    "one_month_forecast": { "$ref": "inventory-sales-forecast.schema.json" },
+    "three_month_forecast": { "$ref": "inventory-sales-forecast.schema.json" },
+
+    "event_adjustments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "event_id": { "type": "string" },
+          "event_name": { "type": "string" },
+          "start_date": { "type": "string", "format": "date" },
+          "end_date": { "type": "string", "format": "date" },
+          "lift_multiplier_applied": { "type": "number" },
+          "lift_source": { "enum": ["HISTORICAL", "CONFIG_DEFAULT"] },
+          "lift_confidence": { "$ref": "common-types.schema.json#/$defs/confidenceLevel" }
+        },
+        "required": ["event_id", "lift_multiplier_applied", "lift_source"]
+      }
+    },
+
+    "financial_risk": {
+      "type": "object",
+      "properties": {
+        "units_below_break_even": { "type": "integer" },
+        "pct_below_break_even": { "type": "number", "minimum": 0, "maximum": 1 },
+        "total_exposure_below_break_even": { "$ref": "common-types.schema.json#/$defs/money" },
+        "projected_depreciation_exposure": { "$ref": "common-types.schema.json#/$defs/percentileSet" },
+        "projected_cash_holding_exposure": { "$ref": "common-types.schema.json#/$defs/percentileSet" }
+      },
+      "required": ["units_below_break_even", "pct_below_break_even"]
+    },
+
+    "top_contributors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "vehicle_id": { "type": "string" },
+          "expected_net_economic_value_p50": { "type": "number" },
+          "expected_gross_p50": { "type": "number" }
+        },
+        "required": ["vehicle_id", "expected_net_economic_value_p50"]
+      }
+    },
+
+    "top_risk_vehicles": {
+      "type": "array",
+      "description": "Ranked by expected economic damage, not by age alone. Cost basis is a scoring input so a $45,000 unit at moderate risk outranks a $9,000 unit at high risk -- the list exists to direct attention, and attention should follow dollars at stake.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "vehicle_id": { "type": "string" },
+          "risk_score": { "type": "number" },
+          "risk_factors": { "type": "array", "items": { "type": "string" } },
+          "prob_age_over_90": { "type": "number" },
+          "p90_depreciation_loss": { "type": "number" },
+          "prob_negative_net_value": { "type": "number" },
+          "cost_basis": { "type": "number" }
+        },
+        "required": ["vehicle_id", "risk_score", "risk_factors"]
+      }
+    },
+
+    "recommended_actions": {
+      "type": "array",
+      "description": "Exactly one action per vehicle, from a deterministic decision table evaluated in order (first match wins), so the mapping is auditable.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "vehicle_id": { "type": "string" },
+          "action": {
+            "enum": ["RETAIN_PRICE", "INCREASE_PRICE", "BALANCED_REPRICE", "VELOCITY_REPRICE",
+                     "EVENT_PROMOTION", "MANAGER_REVIEW", "WHOLESALE_DISPOSITION", "LOSS_MINIMIZATION_REVIEW"]
+          },
+          "matched_rule": { "type": "string" },
+          "suggested_price": { "type": ["number", "null"] },
+          "expected_impact_p50": { "type": ["number", "null"] }
+        },
+        "required": ["vehicle_id", "action", "matched_rule"]
+      }
+    },
+
+    "warnings": { "type": "array", "items": { "$ref": "warning.schema.json" } },
+    "explanation_inputs": { "$ref": "common-types.schema.json#/$defs/explanationInputs" },
+    "audit": { "$ref": "audit-metadata.schema.json" }
+  },
+
+  "required": [
+    "dealer_context", "data_coverage", "inventory_summary", "portfolio_valuation",
+    "aging_profile", "capacity_position", "one_month_forecast", "three_month_forecast",
+    "financial_risk", "top_risk_vehicles", "recommended_actions",
+    "warnings", "explanation_inputs", "audit"
+  ]
+}

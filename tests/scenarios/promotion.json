@@ -1,0 +1,223 @@
+{
+  "suite": "promotion",
+  "spec_ref": "product-spec.md §26.3",
+  "default_as_of": "2026-07-21T14:00:00Z",
+  "baseline_target_math": {
+    "note": "Worked once here so every scenario below can reference it. Implements D6.",
+    "total_physical_slots": 14,
+    "target_utilization": 0.70,
+    "target_ending_inventory": 9,
+    "current_inventory": 12,
+    "confirmed_inbound": 2,
+    "reserved_not_inbound": 1,
+    "baseline_expected_sales_p50_5day_window": 1,
+    "projected_inventory_without_promotion": 13,
+    "incremental_promotional_sales_required": 4,
+    "double_count_check": "reserved_slots (3) is NOT deducted alongside confirmed_inbound (2). Counting both would understate projected inventory by 2 and shrink the requirement from 4 to 2 -- the exact defect D6 prevents."
+  },
+  "expected_candidate_pool": {
+    "eligible": ["V-10001", "V-10002", "V-10003", "V-10004", "V-10006", "V-10007", "V-10008", "V-10012"],
+    "excluded": {
+      "V-10005": "NO_SAFE_HEADROOM",
+      "V-10009": "INSUFFICIENT_DATA",
+      "V-10010": "POLICY_EXCLUDED",
+      "V-10011": "ALREADY_IN_CAMPAIGN"
+    }
+  },
+
+  "scenarios": [
+    {
+      "id": "PR-01",
+      "name": "Realistic target achieved by balanced plan",
+      "event_id": "EVT-LABOR-2026",
+      "target_utilization": 0.85,
+      "mutations": [],
+      "expect": {
+        "feasibility_status": "ACHIEVABLE",
+        "assertions": [
+          "target_ending_inventory = floor(14 x 0.85) = 11; requirement is small",
+          "P(target achieved) >= 0.70 under BALANCED",
+          "all three plans are returned even though BALANCED suffices -- the margin-versus-capacity choice belongs to the general manager"
+        ]
+      }
+    },
+    {
+      "id": "PR-02",
+      "name": "Target not achievable within event window",
+      "event_id": "EVT-SUMMER-2026",
+      "target_utilization": 0.55,
+      "mutations": [],
+      "expect": {
+        "feasibility_status": "NOT_ACHIEVABLE",
+        "warnings_must_include": ["UNREALISTIC_INVENTORY_TARGET", "CAPACITY_TARGET_UNLIKELY_TO_BE_ACHIEVED"],
+        "assertions": [
+          "target_ending_inventory = 7, requiring 6 incremental sales in a 5-day window",
+          "feasibility.alternatives is non-empty and every entry carries a QUANTIFIED change with a unit",
+          "returning NOT_ACHIEVABLE without quantified alternatives would leave the merchandising manager exactly where they started",
+          "each alternative reports resulting_probability_target_achieved"
+        ]
+      }
+    },
+    {
+      "id": "PR-03",
+      "name": "Insufficient safe candidates",
+      "event_id": "EVT-SUMMER-2026",
+      "target_utilization": 0.70,
+      "mutations": [
+        { "op": "set", "path": "policy.excluded_from_promotion", "value": ["V-10010", "V-10001", "V-10002", "V-10003", "V-10007"] }
+      ],
+      "expect": {
+        "warnings_must_include": ["INSUFFICIENT_SAFE_PROMOTION_CANDIDATES"],
+        "assertions": [
+          "only 3 eligible candidates remain, below min_safe_candidates (5)",
+          "the skill stops before building plans that cannot work",
+          "excluded_vehicles still reports every exclusion with its reason"
+        ]
+      }
+    },
+    {
+      "id": "PR-04",
+      "name": "Event with validated demand lift",
+      "event_id": "EVT-SUMMER-2026",
+      "target_utilization": 0.70,
+      "mutations": [],
+      "expect": {
+        "lift_source": "HISTORICAL",
+        "warnings_must_not_include": ["LOW_EXPECTED_EVENT_LIFT"],
+        "assertions": [
+          "historical_demand_lift 1.42 from lift_basis 3 prior events is applied",
+          "lift_confidence is MEDIUM, not HIGH -- three events is thin evidence",
+          "the lift multiplier applies only within the event window"
+        ]
+      }
+    },
+    {
+      "id": "PR-05",
+      "name": "Event without historical demand lift",
+      "event_id": "EVT-LABOR-2026",
+      "target_utilization": 0.70,
+      "mutations": [],
+      "expect": {
+        "lift_source": "CONFIG_DEFAULT",
+        "warnings_must_include": ["LOW_EXPECTED_EVENT_LIFT"],
+        "assertions": [
+          "historical_demand_lift is null, so the configured default 1.35 is used",
+          "lift_confidence is LOW",
+          "how much a past event's lift generalizes to a different event type is unaddressed by this model (open-questions.md C3), and the warning is the honest surfacing of that"
+        ]
+      }
+    },
+    {
+      "id": "PR-06",
+      "name": "Partner-funded incentive",
+      "event_id": "EVT-LABOR-2026",
+      "target_utilization": 0.75,
+      "mutations": [],
+      "expect": {
+        "assertions": [
+          "partner_funded_incentives of $4,000 are EXCLUDED from the dealer budget check",
+          "they are INCLUDED in the customer-facing promotion_price",
+          "totals.total_dealer_funded is compared against budget_limit; total_partner_funded is not",
+          "a plan can be within budget while offering discounts exceeding the dealer-funded budget"
+        ]
+      }
+    },
+    {
+      "id": "PR-07",
+      "name": "Promotion budget exceeded",
+      "event_id": "EVT-SUMMER-2026",
+      "target_utilization": 0.65,
+      "mutations": [{ "op": "set", "path": "events.EVT-SUMMER-2026.promotion_budget", "value": 3000 }],
+      "expect": {
+        "warnings_must_include": ["PROMOTION_BUDGET_EXCEEDED"],
+        "assertions": [
+          "CAPACITY_FIRST requires more dealer-funded discount than the $3,000 budget",
+          "the plan is still RETURNED, truncated at budget, rather than suppressed",
+          "totals.within_budget is false",
+          "PROMOTION_BUDGET_EXCEEDED is MEDIUM, not BLOCKING -- exceeding budget is a decision for the general manager, not a publication bar"
+        ]
+      }
+    },
+    {
+      "id": "PR-08",
+      "name": "Price cannibalization among duplicate vehicles",
+      "event_id": "EVT-SUMMER-2026",
+      "target_utilization": 0.70,
+      "mutations": [],
+      "expect": {
+        "warnings_must_include": ["PRICE_CANNIBALIZATION_RISK"],
+        "assertions": [
+          "V-10001 and V-10007 form a duplicate group: same model, year within 1, same trim, mileage within 15,000 (42,000 vs 39,000)",
+          "a plan discounting both triggers the warning",
+          "because plans are simulated JOINTLY, the cross-elasticity suppression appears in incremental_units_sold automatically rather than needing a separate adjustment",
+          "incremental units from discounting both is strictly less than the sum of discounting each alone"
+        ]
+      }
+    },
+    {
+      "id": "PR-09",
+      "name": "Emergency markdown requiring approval",
+      "event_id": "EVT-SUMMER-2026",
+      "target_utilization": 0.60,
+      "mutations": [],
+      "expect": {
+        "warnings_must_include": ["EMERGENCY_MARKDOWN_APPROVAL_REQUIRED"],
+        "assertions": [
+          "the requirement forces discounts into the emergency markdown reserve (last 20% of headroom)",
+          "approvals_required includes EMERGENCY_MARKDOWN",
+          "user confirmation does NOT substitute for manager approval -- the two gates are independent",
+          "V-10012 (130 days) is the expected first candidate to reach this reserve"
+        ]
+      }
+    },
+    {
+      "id": "PR-10",
+      "name": "Plan still above capacity target",
+      "event_id": "EVT-SUMMER-2026",
+      "target_utilization": 0.60,
+      "mutations": [],
+      "expect": {
+        "feasibility_status": "AT_RISK",
+        "warnings_must_include": ["CAPACITY_TARGET_UNLIKELY_TO_BE_ACHIEVED"],
+        "assertions": [
+          "even CAPACITY_FIRST leaves projected_ending_inventory.p50 above target_ending_inventory (8)",
+          "P(target achieved) falls between 0.30 and 0.70",
+          "gross_impact is negative and is stated as a cost, not framed as a tradeoff"
+        ]
+      }
+    },
+    {
+      "id": "PR-11",
+      "name": "Vehicle expected to sell before the event is excluded",
+      "event_id": "EVT-LABOR-2026",
+      "target_utilization": 0.70,
+      "mutations": [],
+      "spec_ref": "§15.6, open-questions.md C4",
+      "expect": {
+        "warnings_must_include": ["VEHICLE_EXPECTED_TO_SELL_BEFORE_EVENT"],
+        "assertions": [
+          "the Labor Day event starts 45 days after as_of, so vehicles with P50 days to sale under 45 are excluded",
+          "V-10001 and V-10007 are expected to be excluded on this rule",
+          "discounting a vehicle that would have sold at full price is a pure gross giveaway -- the most common way an event destroys margin",
+          "the threshold is this design's choice, not a specification requirement"
+        ]
+      }
+    },
+    {
+      "id": "PR-12",
+      "name": "Baseline uses the same seed as the plans",
+      "event_id": "EVT-SUMMER-2026",
+      "target_utilization": 0.70,
+      "mutations": [],
+      "spec_ref": "D2",
+      "expect": {
+        "assertions": [
+          "a plan selecting ZERO vehicles yields incremental_units_sold of exactly 0 in every draw",
+          "without a shared seed, an empty plan would show nonzero incremental units from sampling noise alone",
+          "all three plans and the baseline report the same seed in their simulationRef",
+          "this is the regression test for seed sharing"
+        ]
+      }
+    }
+  ]
+}

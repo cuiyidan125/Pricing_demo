@@ -1,0 +1,45 @@
+{
+  "data": {
+    "dealer_id": "DEALER-1001",
+    "events": [
+      {
+        "event_id": "EVT-SUMMER-2026",
+        "event_name": "Summer Clearance",
+        "start_date": "2026-07-23",
+        "end_date": "2026-07-27",
+        "event_type": "SEASONAL_CLEARANCE",
+        "eligible_inventory_filter": { "status": ["ACTIVE"], "min_days_in_inventory": 21 },
+        "promotion_budget": 12000,
+        "dealer_funded_incentives": 12000,
+        "partner_funded_incentives": 0,
+        "historical_demand_lift": 1.42,
+        "lift_confidence": "MEDIUM",
+        "lift_basis": 3,
+        "_note": "Starts two days after as_of, matching the §15.2 example. Validated lift from 3 prior comparable events."
+      },
+      {
+        "event_id": "EVT-LABOR-2026",
+        "event_name": "Labor Day Sales Event",
+        "start_date": "2026-09-04",
+        "end_date": "2026-09-07",
+        "event_type": "HOLIDAY",
+        "eligible_inventory_filter": { "status": ["ACTIVE"] },
+        "promotion_budget": 18000,
+        "dealer_funded_incentives": 14000,
+        "partner_funded_incentives": 4000,
+        "historical_demand_lift": null,
+        "lift_confidence": "UNKNOWN",
+        "lift_basis": 0,
+        "_note": "historical_demand_lift is deliberately null. §26.3 requires an event WITHOUT validated lift; this forces the configured default and raises LOW_EXPECTED_EVENT_LIFT. It also carries partner-funded incentives, exercising that path."
+      }
+    ]
+  },
+  "meta": {
+    "source": "INTERNAL_EVENT",
+    "data_timestamp": "2026-07-21T05:30:00Z",
+    "source_version": "event-mcp-mock-0.1.0",
+    "confidence": "MEDIUM",
+    "coverage": 1.0,
+    "freshness_class": "DAILY"
+  }
+}

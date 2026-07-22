@@ -1,0 +1,28 @@
+{
+  "data": {
+    "dealer_id": "DEALER-1001",
+    "window_months": 12,
+    "sales": [
+      { "vehicle_id": "H-9001", "segment": "SUV",    "transaction_price": 28100, "list_price_at_sale": 28995, "days_to_sale": 34, "front_end_gross": 2340, "sale_date": "2026-07-08", "event_participation": null,               "promoted": false },
+      { "vehicle_id": "H-9002", "segment": "SEDAN",  "transaction_price": 21450, "list_price_at_sale": 21995, "days_to_sale": 51, "front_end_gross": 1180, "sale_date": "2026-07-02", "event_participation": null,               "promoted": false },
+      { "vehicle_id": "H-9003", "segment": "TRUCK",  "transaction_price": 33900, "list_price_at_sale": 34995, "days_to_sale": 29, "front_end_gross": 2810, "sale_date": "2026-06-26", "event_participation": null,               "promoted": false },
+      { "vehicle_id": "H-9004", "segment": "SUV",    "transaction_price": 25600, "list_price_at_sale": 26495, "days_to_sale": 22, "front_end_gross": 1640, "sale_date": "2026-06-14", "event_participation": "EVT-SPRING-2026", "promoted": true },
+      { "vehicle_id": "H-9005", "segment": "SEDAN",  "transaction_price": 17800, "list_price_at_sale": 18495, "days_to_sale": 19, "front_end_gross": 940,  "sale_date": "2026-06-12", "event_participation": "EVT-SPRING-2026", "promoted": true },
+      { "vehicle_id": "H-9006", "segment": "SUV",    "transaction_price": 30200, "list_price_at_sale": 31495, "days_to_sale": 17, "front_end_gross": 1990, "sale_date": "2026-06-11", "event_participation": "EVT-SPRING-2026", "promoted": true },
+      { "vehicle_id": "H-9007", "segment": "LUXURY", "transaction_price": 31400, "list_price_at_sale": 32995, "days_to_sale": 78, "front_end_gross": 1420, "sale_date": "2026-05-30", "event_participation": null,               "promoted": false },
+      { "vehicle_id": "H-9008", "segment": "TRUCK",  "transaction_price": 29750, "list_price_at_sale": 30495, "days_to_sale": 41, "front_end_gross": 2050, "sale_date": "2026-05-19", "event_participation": null,               "promoted": false },
+      { "vehicle_id": "H-9009", "segment": "EV",     "transaction_price": 19900, "list_price_at_sale": 21495, "days_to_sale": 94, "front_end_gross": 310,  "sale_date": "2026-05-04", "event_participation": null,               "promoted": false },
+      { "vehicle_id": "H-9010", "segment": "SEDAN",  "transaction_price": 16200, "list_price_at_sale": 16995, "days_to_sale": 62, "front_end_gross": 780,  "sale_date": "2026-04-22", "event_participation": null,               "promoted": false }
+    ],
+    "_note_list_price_at_sale": "This field is the §9.9 addition from D4. Without it, expected_discount_rate cannot be calibrated from dealer history and minimum_safe_list_price rests entirely on a configured constant. The observed discount here averages roughly 3.4%, above the 2.5% configured default -- which is exactly the kind of gap calibration would close, and which the MVP deliberately does NOT close (the configured value is still used).",
+    "_note_promoted": "Three EVT-SPRING-2026 sales are flagged promoted, with visibly shorter days_to_sale and lower gross than the baseline sales. Comparing promoted against baseline is what makes event lift measurable at all (§26.3)."
+  },
+  "meta": {
+    "source": "VAUTO",
+    "data_timestamp": "2026-07-20T00:00:00Z",
+    "source_version": "vauto-mcp-mock-0.1.0",
+    "confidence": "MEDIUM",
+    "coverage": 1.0,
+    "freshness_class": "VERSIONED"
+  }
+}

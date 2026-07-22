@@ -1,0 +1,81 @@
+# Warning code -> severity mapping. Implements D7.
+# product-spec.md §20.1 defines six severities but maps no codes to them.
+#
+# BLOCKING is reserved exclusively for the §19.1 publication bars. "Blocking" therefore
+# always means publish_vehicle_price is refused, and never merely "serious".
+# Authoritative narrative: docs/fail-safe-policy.md §4.
+
+severities: [INFO, LOW, MEDIUM, HIGH, CRITICAL, BLOCKING]
+
+single_vehicle:
+  P50_TRANSACTION_PRICE_BELOW_BREAK_EVEN:   { severity: BLOCKING, blocks_publication: true }
+  MINIMUM_SAFE_LIST_PRICE_VIOLATION:        { severity: BLOCKING, blocks_publication: true }
+  DISCOUNT_EXCEEDS_SAFE_HEADROOM:           { severity: BLOCKING, blocks_publication: true }
+  HIGH_PROBABILITY_OF_NEGATIVE_NET_VALUE:   { severity: BLOCKING, blocks_publication: true }
+  PRICE_BELOW_CURRENT_BREAK_EVEN:           { severity: CRITICAL }
+  BREAK_EVEN_EXCEEDS_MARKET_VALUE:          { severity: CRITICAL }
+  INSUFFICIENT_VEHICLE_DATA:
+    severity: HIGH
+    escalate_to_blocking_when: "cost_basis_missing"
+  RECOMMENDED_PRICE_POOR_DEAL:              { severity: HIGH }
+  P10_TRANSACTION_PRICE_BELOW_BREAK_EVEN:   { severity: HIGH }
+  BREAK_EVEN_MARKET_CROSSOVER_RISK:         { severity: HIGH }
+  P50_PROJECTED_INVENTORY_AGE_OVER_120_DAYS:{ severity: HIGH }
+  EXTERNAL_PROVIDER_VARIANCE:
+    severity: MEDIUM
+    escalate_to: HIGH
+    escalate_when: "divergence > 0.10"      # D5
+  LOW_VALUATION_CONFIDENCE:                 { severity: MEDIUM }
+  EXTERNAL_VALUATION_UNAVAILABLE:           { severity: MEDIUM }
+  CURRENT_PRICE_POOR_DEAL:                  { severity: MEDIUM }
+  P50_PROJECTED_INVENTORY_AGE_OVER_90_DAYS: { severity: MEDIUM }
+  P90_PROJECTED_INVENTORY_AGE_OVER_120_DAYS:{ severity: MEDIUM }
+  HIGH_DEPRECIATION_RISK:                   { severity: MEDIUM }
+  HOLDING_COST_EXCEEDS_INCREMENTAL_GROSS:   { severity: MEDIUM }
+  # Deliberately the lowest in this group: a 10% chance of exceeding 90 days is
+  # unremarkable for used inventory. Its P50 counterpart is a real problem.
+  P90_PROJECTED_INVENTORY_AGE_OVER_90_DAYS: { severity: LOW }
+
+portfolio:
+  HIGH_PERCENTAGE_BELOW_BREAK_EVEN:         { severity: CRITICAL }
+  STALE_MARKET_DATA:
+    severity: HIGH
+    blocks_publication: true                # only for affected vehicles, at publication
+    scope_note: "Analysis proceeds; publication of affected vehicles is refused."
+  HIGH_AGED_INVENTORY_CONCENTRATION:        { severity: HIGH }
+  PROJECTED_CAPACITY_OVER_100_PERCENT:      { severity: HIGH }
+  INBOUND_CAPACITY_CONFLICT:                { severity: HIGH }
+  INCOMPLETE_INVENTORY_DATA:                { severity: MEDIUM }
+  LOW_PORTFOLIO_FORECAST_CONFIDENCE:        { severity: MEDIUM }
+  HIGH_PROJECTED_DEPRECIATION:              { severity: MEDIUM }
+  PROJECTED_CAPACITY_OVER_TARGET:           { severity: MEDIUM }
+  ONE_MONTH_REVENUE_BELOW_TARGET:           { severity: MEDIUM }
+  THREE_MONTH_REVENUE_BELOW_TARGET:         { severity: MEDIUM }
+  HIGH_PORTFOLIO_HOLDING_COST:              { severity: LOW }
+  FUTURE_ACQUISITION_DATA_UNAVAILABLE:      { severity: INFO }
+
+promotion:
+  PROMOTIONAL_PRICE_BELOW_BREAK_EVEN:       { severity: BLOCKING, blocks_publication: true }
+  PROMOTION_EXCEEDS_SAFE_HEADROOM:          { severity: BLOCKING, blocks_publication: true }
+  UNREALISTIC_INVENTORY_TARGET:             { severity: HIGH }
+  INSUFFICIENT_SAFE_PROMOTION_CANDIDATES:   { severity: HIGH }
+  PROMOTION_COST_EXCEEDS_EXPECTED_SAVINGS:  { severity: HIGH }
+  EMERGENCY_MARKDOWN_APPROVAL_REQUIRED:     { severity: HIGH, requires_approval: true }
+  PROMOTION_BUDGET_EXCEEDED:                { severity: MEDIUM }
+  LOW_EXPECTED_EVENT_LIFT:                  { severity: MEDIUM }
+  PRICE_CANNIBALIZATION_RISK:               { severity: MEDIUM }
+  CAPACITY_TARGET_UNLIKELY_TO_BE_ACHIEVED:  { severity: MEDIUM }
+  VEHICLE_EXPECTED_TO_SELL_BEFORE_EVENT:    { severity: LOW }
+  VEHICLE_ALREADY_ASSIGNED_TO_CAMPAIGN:     { severity: LOW }
+
+# Every emitted warning must carry observed, threshold, and unit so the user sees the
+# margin by which a rule was missed. See docs/fail-safe-policy.md §4.4.
+required_payload_fields:
+  - code
+  - severity
+  - scope
+  - message
+  - observed
+  - threshold
+  - unit
+  - blocks_publication

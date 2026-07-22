@@ -1,0 +1,48 @@
+# Pricing strategy and dealer policy floors.
+#
+# NOTE: policy_price_floor and risk_floor have no MCP source in product-spec.md §10.
+# See docs/open-questions.md C1. In production these belong in get_dealer_pricing_policy;
+# they live here only because the prototype has nowhere else to put them.
+
+# product-spec.md §13.5. Target price expressed as a ratio to market value.
+strategies:
+  MAXIMIZE_GROSS:
+    price_to_market_target: 1.03
+    description: "Protect front-end gross; accept longer time to sale."
+  BALANCED:
+    price_to_market_target: 0.99
+    description: "Market-competitive position."
+  INCREASE_VELOCITY:
+    price_to_market_target: 0.95
+    description: "Price for turn; accept reduced gross."
+
+# Rounding to a retail price point.
+price_point_rounding:
+  enabled: true
+  round_to: 100
+  offset: -5          # 18995, 24995
+  never_round_below_floor: true
+
+# §11.9, §11.10
+policy_floor:
+  # Floor as a fraction of total cost basis. 1.0 = never below cost.
+  cost_basis_multiple: 1.0
+  minimum_gross_policy: 0.0
+  # §11.10 configured risk floor, as a fraction of market value.
+  risk_floor_pct_of_market: 0.72
+
+# §19.1 fourth publication bar.
+negative_value_threshold: 0.35     # P(net economic value < 0) above this blocks publication
+
+# §22.2 thresholds left qualitative in the spec. See open-questions.md C4.
+approval_thresholds:
+  aggressive_adjustment_pct: 0.08          # change from current list price
+  material_gross_reduction_pct: 0.20       # plan gross vs baseline gross
+
+# Used only when get_vehicle_market_position supplies no thresholds of its own.
+# Expressed as price-to-market ratios.
+deal_rating_fallback:
+  great_deal_max: 0.93
+  good_deal_max: 0.97
+  fair_deal_max: 1.03
+  # above fair_deal_max is a poor deal
