@@ -1,4 +1,4 @@
-# Internal Used Vehicle Pricing and Inventory Optimization Agent
+# Used Vehicle Pricing and Inventory Optimization Agent
 
 A prototype decision-support tool for used-vehicle dealership inventory managers. It
 recommends a list price for a vehicle, forecasts what the whole lot will do over 30 and 90
