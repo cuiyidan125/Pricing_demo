@@ -183,7 +183,7 @@ for plan_type in ("MARGIN_PROTECT", "BALANCED", "CAPACITY_FIRST"):
         )
     )
 figure.update_layout(barmode="group", height=320, margin=dict(t=20, b=10))
-st.plotly_chart(figure, use_container_width=True)
+st.plotly_chart(figure)
 
 # --- alternatives ---------------------------------------------------------------------
 
@@ -203,7 +203,6 @@ if feasibility["alternatives"]:
             ]
         ),
         hide_index=True,
-        use_container_width=True,
         column_config={
             "Resulting P(target)": st.column_config.NumberColumn(format="%.0f%%"),
         },
@@ -231,7 +230,7 @@ with promote_tab:
     ]
     if rows:
         st.dataframe(
-            pd.DataFrame(rows), hide_index=True, use_container_width=True,
+            pd.DataFrame(rows), hide_index=True,
             column_config={
                 c: st.column_config.NumberColumn(format="$%d")
                 for c in ("Current", "Promotion price", "Discount", "Min safe list")
@@ -244,11 +243,11 @@ with promote_tab:
 with protect_tab:
     rows = [{"Stock": a["vehicle_id"], "Why": a["reason"]} for a in actions if a["action"] == "PROTECT_PRICE"]
     st.dataframe(pd.DataFrame(rows) if rows else pd.DataFrame([{"Stock": "—", "Why": "none"}]),
-                 hide_index=True, use_container_width=True)
+                 hide_index=True)
 
 with exclude_tab:
     rows = [{"Stock": a["vehicle_id"], "Reason": a["reason"]} for a in actions if a["action"] == "EXCLUDE"]
-    st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+    st.dataframe(pd.DataFrame(rows), hide_index=True)
     st.caption(
         "Every exclusion carries a reason — a plan is not reviewable if you cannot see "
         "what was left out. `NO_SAFE_HEADROOM` means the vehicle is already at or below "

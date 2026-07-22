@@ -147,7 +147,7 @@ with lot_tab:
     frame = pd.DataFrame(rows).sort_values("Risk", ascending=False)
 
     st.dataframe(
-        frame, hide_index=True, use_container_width=True,
+        frame, hide_index=True,
         column_config={
             "List price": st.column_config.NumberColumn(format="$%d"),
             "Risk": st.column_config.ProgressColumn(format="%.0f", min_value=0, max_value=100),
@@ -197,7 +197,7 @@ with forecast_tab:
         figure.update_layout(
             height=260, yaxis_title="Revenue ($)", margin=dict(t=20, b=10), showlegend=False
         )
-        st.plotly_chart(figure, use_container_width=True)
+        st.plotly_chart(figure)
 
     st.subheader("Aging profile")
     aging_frame = pd.DataFrame(
@@ -212,7 +212,7 @@ with forecast_tab:
         ]
     )
     st.dataframe(
-        aging_frame, hide_index=True, use_container_width=True,
+        aging_frame, hide_index=True,
         column_config={"Cost basis": st.column_config.NumberColumn(format="$%d")},
     )
     st.caption(
@@ -258,7 +258,7 @@ with risk_tab:
         )
         st.dataframe(
             pd.DataFrame(result["audit"]["mcp_tools_called"]),
-            hide_index=True, use_container_width=True,
+            hide_index=True,
         )
 
 st.info(

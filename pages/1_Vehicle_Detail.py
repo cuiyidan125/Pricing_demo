@@ -120,7 +120,7 @@ with st.expander("Ask in plain English", expanded=False):
         right.markdown("**Field provenance**")
         right.dataframe(
             pd.DataFrame(request["extraction_provenance"]),
-            hide_index=True, use_container_width=True,
+            hide_index=True,
         )
         st.caption(
             "Note what is absent: no price, no valuation, no days-to-sale. Those fields "
@@ -257,7 +257,7 @@ with left:
         height=380,
         margin=dict(t=20, b=10),
     )
-    st.plotly_chart(figure, use_container_width=True)
+    st.plotly_chart(figure)
 
     table = pd.DataFrame(
         [
@@ -279,7 +279,6 @@ with left:
     st.dataframe(
         table,
         hide_index=True,
-        use_container_width=True,
         column_config={
             "List price": st.column_config.NumberColumn(format="$%d"),
             "Price to market": st.column_config.NumberColumn(format="%.3f"),
@@ -356,7 +355,7 @@ if headroom["ladder"]:
         height=320,
         margin=dict(t=20, b=10),
     )
-    st.plotly_chart(ladder_figure, use_container_width=True)
+    st.plotly_chart(ladder_figure)
 
 # --- comparables ----------------------------------------------------------------------
 
@@ -391,7 +390,7 @@ if included:
         xaxis_title="Mileage", yaxis_title="List price ($)", height=360,
         margin=dict(t=20, b=10),
     )
-    st.plotly_chart(comps_figure, use_container_width=True)
+    st.plotly_chart(comps_figure)
 
 st.caption(
     md(
@@ -427,7 +426,6 @@ with st.expander(f"Excluded comparables ({len(excluded)})"):
                 ]
             ),
             hide_index=True,
-            use_container_width=True,
         )
     else:
         st.write("None.")
@@ -451,14 +449,23 @@ with st.expander("Assumptions and audit trail"):
     )
     st.write("**MCP tools called**")
     st.dataframe(
-        pd.DataFrame(audit["mcp_tools_called"]), hide_index=True, use_container_width=True
+        pd.DataFrame(audit["mcp_tools_called"]), hide_index=True
     )
     st.write("**Values the explanation layer may cite**")
-    st.dataframe(
-        pd.DataFrame(result["explanation_inputs"]["values"]),
-        hide_index=True,
-        use_container_width=True,
-    )
+    allow_list = pd.DataFrame(result["explanation_inputs"]["values"])
+    # The allow-list is genuinely mixed by design — labels like MAXIMIZE_GROSS sit
+    # alongside figures like 29195 in one column — so Arrow cannot infer a type and
+    # throws on every render. Streamlit recovers, but noisily. Rendering the column as
+    # text is the honest fix: this table is for reading, not arithmetic.
+    def _cell(value) -> str:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return str(value)
+        # Dollars and day counts are integral; ratios are not, and need their decimals.
+        return f"{value:,.0f}" if float(value).is_integer() else f"{value:,.4g}"
+
+    if "value" in allow_list.columns:
+        allow_list["value"] = allow_list["value"].map(_cell)
+    st.dataframe(allow_list, hide_index=True)
     st.caption(
         "The narration layer receives only this table. A currency figure in generated "
         "prose that does not appear here fails the response rather than reaching you."
