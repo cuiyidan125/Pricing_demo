@@ -94,6 +94,11 @@ foreach ($f in Get-ChildItem "$root\mocks" -Recurse -Filter *.json | Sort-Object
     if ($null -eq $doc) { continue }
     $rel = $f.FullName.Substring("$root\mocks\".Length).Replace('\', '/')
     $fixtures[$rel] = $doc
+    if ($rel.StartsWith('llm/')) {
+        # Recorded model responses, not MCP tool responses: no provenance envelope.
+        Add-Pass "mocks/$rel parses (recorded model response)"
+        continue
+    }
     if ($null -eq $doc.meta) { Add-Failure "mocks/${rel}: missing meta envelope"; continue }
     $missing = $required | Where-Object { $null -eq $doc.meta.PSObject.Properties[$_] }
     if ($missing) { Add-Failure "mocks/${rel}: meta missing $($missing -join ', ')" }

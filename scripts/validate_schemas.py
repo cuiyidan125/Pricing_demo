@@ -126,6 +126,10 @@ for path in sorted(MOCK_DIR.rglob("*.json")):
         continue
     rel = str(path.relative_to(MOCK_DIR)).replace("\\", "/")
     fixtures[rel] = doc
+    if rel.startswith("llm/"):
+        # Recorded model responses, not MCP tool responses: no provenance envelope.
+        ok(f"mocks/{rel} parses (recorded model response)")
+        continue
     meta = doc.get("meta")
     if not isinstance(meta, dict):
         fail(f"mocks/{rel}: missing `meta` envelope")
