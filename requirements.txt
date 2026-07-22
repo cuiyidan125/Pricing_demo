@@ -12,9 +12,14 @@ PyYAML>=6.0
 numpy>=1.26
 pandas>=2.2
 
-# UI (not built until §28 step 10 preconditions are met)
+# UI
 streamlit>=1.33
 plotly>=5.20
+
+# LLM orchestration and explanation layer.
+# Never imported by src/pricing_agent/domain or /simulation -- enforced by
+# tests/unit/test_architecture.py.
+anthropic>=0.40
 
 # Tests
 pytest>=8.0

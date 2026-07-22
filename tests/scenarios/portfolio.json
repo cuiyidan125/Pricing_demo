@@ -153,11 +153,13 @@
       "spec_ref": "§14.7, D2",
       "expect": {
         "assertions": [
-          "portfolio sales_revenue.p50 is STRICTLY LESS than the sum of per-vehicle transaction_price.p50 over vehicles with P(sale within 30d) > 0.5",
-          "summing per-vehicle medians credits every vehicle with a median outcome simultaneously and overstates the portfolio median",
+          "sum of per-vehicle P10 revenue contributions is EXACTLY 0, while portfolio sales_revenue.p10 is materially positive (> $25,000)",
+          "no vehicle reaches P(sale within 30d) > 0.9, so every marginal P10 contribution is zero -- yet the lot plainly sells several cars in a bad month",
+          "portfolio sales_revenue.p50 differs from the sum of per-vehicle P50 contributions by more than $2,000 in either direction",
           "unit_sales, sales_revenue, front_end_gross, and net_economic_value all carry the same simulation_id",
           "this is the regression test for the §14.7 prohibition"
-        ]
+        ],
+        "note": "An earlier draft asserted the portfolio P50 was strictly LESS than the sum of per-vehicle P50s. That was wrong twice over: the direction is not guaranteed, and the comparison was knife-edge because the naive sum jumps discontinuously as vehicles cross P(sale) = 0.5. The P10 form above is threshold-free and demonstrates the same point far more starkly. Measured at the current calibration: marginals sum to $0, portfolio P10 is $51,732."
       }
     }
   ]

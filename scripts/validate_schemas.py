@@ -217,6 +217,40 @@ for path in sorted(SCENARIO_DIR.glob("*.json")):
     ok(f"{path.name}: {len(doc.get('scenarios', []))} scenarios")
 
 
+# --- 7: warning codes are mapped to severities (D7) -----------------------------------
+
+print("\nWarning severity mapping")
+try:
+    import yaml
+
+    mapping = yaml.safe_load(
+        (ROOT / "config" / "assumptions" / "warnings.yaml").read_text(encoding="utf-8")
+    )
+    mapped: set[str] = set()
+    for group in ("single_vehicle", "portfolio", "promotion"):
+        mapped |= set(mapping.get(group, {}) or {})
+
+    unmapped = warning_codes - mapped
+    orphaned = mapped - warning_codes
+
+    if unmapped:
+        # A YAML key written as `CODE:{ severity: X }` -- no space after the colon --
+        # is not parsed as a mapping and the code silently disappears. This check exists
+        # because exactly that happened.
+        fail(f"warnings.yaml does not map: {sorted(unmapped)}")
+    if orphaned:
+        fail(f"warnings.yaml maps codes absent from warning.schema.json: {sorted(orphaned)}")
+    if not unmapped and not orphaned:
+        ok(f"all {len(warning_codes)} warning codes have a declared severity")
+
+    for group in ("single_vehicle", "portfolio", "promotion"):
+        for code, rule in (mapping.get(group, {}) or {}).items():
+            if not isinstance(rule, dict) or "severity" not in rule:
+                fail(f"warnings.yaml {group}.{code}: no severity (check YAML spacing)")
+except ImportError:  # pragma: no cover
+    fail("PyYAML not installed; cannot check the severity mapping")
+
+
 # --- report ---------------------------------------------------------------------------
 
 print()

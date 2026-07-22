@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pricing-agent"
+version = "0.1.0"
+description = "Internal Used Vehicle Pricing and Inventory Optimization Agent (prototype)"
+requires-python = ">=3.11"
+
+# Runtime dependencies are pinned in requirements.txt. Kept out of here so the
+# prototype has one place to look.
+dependencies = []
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+filterwarnings = ["ignore::DeprecationWarning"]

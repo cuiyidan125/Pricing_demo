@@ -16,6 +16,22 @@ strategies:
     price_to_market_target: 0.95
     description: "Price for turn; accept reduced gross."
 
+# How the recommended strategy is chosen among the three.
+#
+# Default: the strategy with the highest P50 net economic value.
+#
+# But optimizing the median is the wrong objective for a vehicle at real risk of not
+# selling. Past the tail threshold the dealer's exposure is dominated by the bad case --
+# the car still sitting in four months, wholesaled at a loss -- and a median-maximizing
+# rule will keep recommending a high price on an aged unit, which is both wrong and
+# indefensible to a general manager. Beyond the threshold the objective switches to the
+# downside percentile.
+strategy_selection:
+  objective_percentile: 50
+  tail_risk_percentile: 10
+  tail_risk_age_days: 120
+  tail_risk_probability: 0.35
+
 # Rounding to a retail price point.
 price_point_rounding:
   enabled: true

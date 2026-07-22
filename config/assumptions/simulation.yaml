@@ -8,19 +8,44 @@ run:
   horizon_days: 365           # draws beyond this are censored, not extrapolated
   parallel_vehicles: true     # one simulation covers the whole portfolio
 
+  # A per-draw multiplier applied to EVERY vehicle's hazard in that draw, standing in
+  # for shared market conditions -- a slow month is slow for all of them at once.
+  # This is what makes portfolio outcomes correlated, and therefore what makes
+  # draw-level aggregation (D2) produce a different answer from summing per-vehicle
+  # medians. With this at 0 the §14.7 prohibition would have no practical consequence.
+  market_factor_sd: 0.18
+  ladder_draw_count: 500      # cheaper search; the chosen rung is re-run at full count
+
+  # Weibull shape for time to sale. k = 1 is a constant (memoryless) hazard, which fixes
+  # the P90/P50 ratio at ln(0.1)/ln(0.5) ~= 3.3 regardless of any other tuning and
+  # produces 300-day P90s that no dealer would recognise. k > 1 gives a rising hazard --
+  # a vehicle that has not sold becomes more likely to sell as it is repriced and
+  # merchandised -- which compresses the tail to roughly 2x. §16.1 names survival
+  # analysis as the production direction for exactly this reason.
+  time_to_sale_shape_k: 1.8
+
 # --- Hazard model (docs/forecast-definitions.md §5.1) ---
 
 hazard:
   # price_position_multiplier is the elasticity driving every velocity-vs-gross tradeoff
   # in the product. It is assumed, not calibrated. See docs/open-questions.md C3.
   price_position:
-    # keyed by price_to_market_ratio
-    0.90: 1.55
-    0.95: 1.28
+    # Keyed by price_to_market_ratio. THE most consequential uncalibrated assumption in
+    # the product (docs/open-questions.md C3): it alone decides every velocity-versus-
+    # gross tradeoff.
+    #
+    # Steepened during the Stage A calibration pass. The original curve (0.90 -> 1.55,
+    # 0.95 -> 1.28) implied an 8% price cut bought only ~50% more demand, which made
+    # holding for margin the right answer for 11 of 12 fixture vehicles including a
+    # 130-day unit -- an answer no used-vehicle manager would accept. On a real lot,
+    # crossing from above-market into good-deal territory changes search ranking and
+    # inquiry volume sharply rather than smoothly.
+    0.90: 2.20
+    0.95: 1.48
     1.00: 1.00
-    1.05: 0.72
-    1.10: 0.48
-    1.15: 0.30
+    1.05: 0.64
+    1.10: 0.38
+    1.15: 0.22
 
   mileage:
     under_30000: 1.12
@@ -49,6 +74,11 @@ hazard:
     # Engagement is partly an effect of price rather than a cause of sale, so its
     # influence is deliberately bounded. Absent, the term is 1.0 (§9.8).
     neutral_multiplier: 1.00
+    # multiplier = clamp((vdp_views / reference) ** elasticity)
+    # The low elasticity keeps a vehicle with triple the views from being modeled as
+    # three times as likely to sell, which the uncalibrated mapping cannot support.
+    reference_vdp_views: 200
+    elasticity: 0.25
 
   seasonality:
     "1": 0.92

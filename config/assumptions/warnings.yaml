@@ -20,7 +20,7 @@ single_vehicle:
   RECOMMENDED_PRICE_POOR_DEAL:              { severity: HIGH }
   P10_TRANSACTION_PRICE_BELOW_BREAK_EVEN:   { severity: HIGH }
   BREAK_EVEN_MARKET_CROSSOVER_RISK:         { severity: HIGH }
-  P50_PROJECTED_INVENTORY_AGE_OVER_120_DAYS:{ severity: HIGH }
+  P50_PROJECTED_INVENTORY_AGE_OVER_120_DAYS: { severity: HIGH }
   EXTERNAL_PROVIDER_VARIANCE:
     severity: MEDIUM
     escalate_to: HIGH
@@ -29,7 +29,7 @@ single_vehicle:
   EXTERNAL_VALUATION_UNAVAILABLE:           { severity: MEDIUM }
   CURRENT_PRICE_POOR_DEAL:                  { severity: MEDIUM }
   P50_PROJECTED_INVENTORY_AGE_OVER_90_DAYS: { severity: MEDIUM }
-  P90_PROJECTED_INVENTORY_AGE_OVER_120_DAYS:{ severity: MEDIUM }
+  P90_PROJECTED_INVENTORY_AGE_OVER_120_DAYS: { severity: MEDIUM }
   HIGH_DEPRECIATION_RISK:                   { severity: MEDIUM }
   HOLDING_COST_EXCEEDS_INCREMENTAL_GROSS:   { severity: MEDIUM }
   # Deliberately the lowest in this group: a 10% chance of exceeding 90 days is
