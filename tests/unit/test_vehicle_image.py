@@ -1,49 +1,80 @@
-"""Image resolution and rendering for the vehicle card.
+"""Vehicle imagery: every demo record has one, and the fallback still works.
 
-The fallback chain is the point: a fixture may name a file that is absent, unreadable, or
-remote, and none of those may put a broken image in front of a customer.
+The fallback chain is the point. A fixture may name a file that is absent, unreadable, or
+remote, and none of those may put a broken image in front of a customer — so the negative
+cases get as much attention as the happy path.
 """
 
 from __future__ import annotations
 
 import base64
+import json
 
 import pytest
 
 import ui_components as ui
 from pricing_agent.config.loader import REPO_ROOT
 
-FIXTURE_PATH = "assets/vehicles/toyota_rav4_2022.jpg"
+ASSETS = REPO_ROOT / "assets" / "vehicles"
 
 
-def test_the_demo_asset_is_actually_in_the_repository():
-    """Guards against the fixture pointing at a file nobody committed."""
-    path = ui.resolve_image(FIXTURE_PATH)
-    assert path is not None, f"{FIXTURE_PATH} did not resolve"
-    assert path.is_file()
-    assert path.stat().st_size > 20_000, "suspiciously small for a photograph"
-
-
-def test_v10001_fixture_points_at_that_asset():
-    import json
-
-    inventory = json.loads(
+def _inventory() -> list[dict]:
+    doc = json.loads(
         (REPO_ROOT / "mocks" / "inventory" / "dealer-1001-inventory.json").read_text(
             encoding="utf-8"
         )
     )
-    vehicle = next(
-        v for v in inventory["data"]["vehicles"] if v["vehicle_id"] == "V-10001"
-    )
-    assert vehicle["image_url"] == FIXTURE_PATH
-    assert ui.resolve_image(vehicle["image_url"]) is not None
+    return doc["data"]["vehicles"]
 
 
-def test_resolution_is_repo_relative_not_cwd_relative(tmp_path, monkeypatch):
-    """Streamlit is usually launched from the repo root, but the page must not depend on
-    it — and tests run from anywhere."""
-    monkeypatch.chdir(tmp_path)
-    assert ui.resolve_image(FIXTURE_PATH) is not None
+VEHICLES = _inventory()
+IDS = [v["vehicle_id"] for v in VEHICLES]
+
+
+# --- every demo vehicle has a working image -------------------------------------------
+
+
+def test_the_demo_fleet_is_the_expected_size():
+    assert len(VEHICLES) == 12
+
+
+@pytest.mark.parametrize("vehicle", VEHICLES, ids=IDS)
+def test_every_vehicle_has_a_non_empty_image_url(vehicle):
+    assert vehicle.get("image_url"), f"{vehicle['vehicle_id']} has no image_url"
+    assert vehicle["image_url"].startswith("assets/vehicles/")
+
+
+@pytest.mark.parametrize("vehicle", VEHICLES, ids=IDS)
+def test_every_referenced_file_exists_and_is_a_real_image(vehicle):
+    path = ui.resolve_image(vehicle["image_url"])
+    assert path is not None, f"{vehicle['image_url']} did not resolve"
+    assert path.is_file()
+    assert path.stat().st_size > 20_000, "suspiciously small for a photograph"
+    assert path.read_bytes()[:3] == b"\xff\xd8\xff", "not a JPEG"
+
+
+@pytest.mark.parametrize("vehicle", VEHICLES, ids=IDS)
+def test_every_vehicle_renders_a_photo_not_a_silhouette(vehicle):
+    markup = ui.vehicle_photo_html(ui.resolve_image(vehicle["image_url"]))
+    assert "data:image/jpeg;base64," in markup
+    assert "<svg" not in markup, "this vehicle fell back to the silhouette"
+
+
+def test_every_asset_on_disk_is_referenced_by_a_vehicle():
+    """Catches images left behind after a swap, which would bloat the repo silently."""
+    referenced = {v["image_url"].rsplit("/", 1)[-1] for v in VEHICLES}
+    on_disk = {p.name for p in ASSETS.glob("*.jpg")}
+    assert on_disk == referenced, f"orphaned: {sorted(on_disk - referenced)}"
+
+
+def test_the_two_rav4s_have_distinct_images():
+    """V-10001 and V-10007 are the duplicate-inventory pair; identical photos would make
+    the cannibalization story confusing to look at."""
+    pair = [v["image_url"] for v in VEHICLES if v["vehicle_id"] in ("V-10001", "V-10007")]
+    assert len(pair) == 2 and pair[0] != pair[1]
+
+
+# --- fallback -------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -57,32 +88,41 @@ def test_resolution_is_repo_relative_not_cwd_relative(tmp_path, monkeypatch):
         "//example.com/car.jpg",
     ],
 )
-def test_unusable_values_resolve_to_none(value):
+def test_unusable_values_resolve_to_none_so_the_silhouette_takes_over(value):
     """Remote URLs are refused deliberately: the demo must work with no network, and a
     runtime fetch would put an unreachable host in front of a customer."""
     assert ui.resolve_image(value) is None
+    assert ui.thumbnail_uri(value) is None
 
 
 def test_paths_cannot_escape_the_repository():
     assert ui.resolve_image("../../../etc/passwd") is None
 
 
-def test_photo_markup_embeds_the_image_rather_than_linking_it():
-    path = ui.resolve_image(FIXTURE_PATH)
-    markup = ui.vehicle_photo_html(path)
+def test_silhouette_is_still_available_for_every_body_style():
+    for segment in ("SEDAN", "SUV", "TRUCK", "VAN", "LUXURY", "EV"):
+        markup = ui.vehicle_silhouette_svg(segment, None)
+        assert markup.startswith("<!DOCTYPE html>")
+        assert "<svg" in markup
 
-    assert markup.startswith("<!DOCTYPE html>")
-    assert "data:image/jpeg;base64," in markup, "must be embedded, not fetched at runtime"
+
+def test_resolution_is_repo_relative_not_cwd_relative(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    assert ui.resolve_image(VEHICLES[0]["image_url"]) is not None
+
+
+# --- rendering rules ------------------------------------------------------------------
+
+
+def test_photo_markup_embeds_rather_than_links():
+    markup = ui.vehicle_photo_html(ui.resolve_image(VEHICLES[0]["image_url"]))
     assert "http://" not in markup and "https://" not in markup
-
-    # The decoded payload must be a real JPEG.
     encoded = markup.split("base64,", 1)[1].split('"', 1)[0]
     assert base64.b64decode(encoded[:64] + "=" * (-len(encoded[:64]) % 4))[:3] == b"\xff\xd8\xff"
 
 
 def test_photo_fills_the_card_without_distorting_the_vehicle():
-    """object-fit: cover crops; it never stretches. A squashed car reads as a bug."""
-    markup = ui.vehicle_photo_html(ui.resolve_image(FIXTURE_PATH))
+    markup = ui.vehicle_photo_html(ui.resolve_image(VEHICLES[0]["image_url"]))
     assert "object-fit:cover" in markup
     assert "border-radius:10px" in markup
     assert "width:100%" in markup
@@ -90,31 +130,30 @@ def test_photo_fills_the_card_without_distorting_the_vehicle():
     assert "background:transparent" in markup
 
 
-def test_photo_and_silhouette_share_a_card_height():
-    """So the layout does not reflow as the user moves between vehicles."""
-    photo = ui.vehicle_photo_html(ui.resolve_image(FIXTURE_PATH))
-    silhouette = ui.vehicle_silhouette_svg("SUV", "RAV4")
-    assert f"height:{ui.CARD_HEIGHT}px" in photo
-    assert silhouette.startswith("<!DOCTYPE html>")
+def test_thumbnails_are_far_smaller_than_the_full_asset():
+    """A dozen full-size images inlined into a dataframe would push megabytes through
+    every rerun."""
+    vehicle = VEHICLES[0]
+    thumbnail = ui.thumbnail_uri(vehicle["image_url"])
+    assert thumbnail and thumbnail.startswith("data:image/jpeg;base64,")
+
+    full_size = ui.resolve_image(vehicle["image_url"]).stat().st_size
+    assert len(thumbnail) < full_size / 2
 
 
-def test_other_vehicles_still_fall_back_to_a_silhouette():
-    import json
-
-    inventory = json.loads(
-        (REPO_ROOT / "mocks" / "inventory" / "dealer-1001-inventory.json").read_text(
-            encoding="utf-8"
-        )
-    )
-    without = [
-        v for v in inventory["data"]["vehicles"] if not v.get("image_url")
-    ]
-    assert len(without) == 11, "only V-10001 should carry a photo"
-    for vehicle in without:
-        assert ui.resolve_image(vehicle.get("image_url")) is None
+def test_thumbnails_are_cached_by_path():
+    first = ui.thumbnail_uri(VEHICLES[1]["image_url"])
+    second = ui.thumbnail_uri(VEHICLES[1]["image_url"])
+    assert first is second
 
 
-def test_attribution_file_records_the_license():
-    text = (REPO_ROOT / "assets" / "vehicles" / "ATTRIBUTION.md").read_text(encoding="utf-8")
-    for required in ("Wikimedia Commons", "CC0", "TTTNIS", "commons.wikimedia.org"):
-        assert required in text, f"attribution is missing {required}"
+# --- attribution ----------------------------------------------------------------------
+
+
+def test_attribution_covers_every_vehicle_and_file():
+    text = (ASSETS / "ATTRIBUTION.md").read_text(encoding="utf-8")
+    for vehicle in VEHICLES:
+        assert vehicle["vehicle_id"] in text, f"no attribution entry for {vehicle['vehicle_id']}"
+        assert vehicle["image_url"].rsplit("/", 1)[-1] in text
+    for required in ("Source website", "Licence", "Creator", "commons.wikimedia.org"):
+        assert required in text

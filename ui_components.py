@@ -14,6 +14,7 @@ Two things live here:
 from __future__ import annotations
 
 import base64
+import io
 import mimetypes
 from functools import lru_cache
 from pathlib import Path
@@ -104,6 +105,34 @@ def _data_uri(path: str, mtime: float) -> str:
     mime = mimetypes.guess_type(file.name)[0] or "image/jpeg"
     encoded = base64.b64encode(file.read_bytes()).decode("ascii")
     return f"data:{mime};base64,{encoded}"
+
+
+@lru_cache(maxsize=64)
+def _thumbnail_uri(path: str, mtime: float, width: int) -> str:
+    from PIL import Image  # local import: only the table path needs it
+
+    with Image.open(path) as image:
+        image = image.convert("RGB")
+        if image.width > width:
+            image = image.resize((width, round(image.height * width / image.width)), Image.LANCZOS)
+        buffer = io.BytesIO()
+        image.save(buffer, format="JPEG", quality=78, optimize=True)
+    return "data:image/jpeg;base64," + base64.b64encode(buffer.getvalue()).decode("ascii")
+
+
+def thumbnail_uri(image_url: str | None, width: int = 220) -> str | None:
+    """A small data URI for table cells, or None when there is no usable image.
+
+    Deliberately not the full asset: a dozen 400 KB images inlined into a dataframe would
+    push several megabytes into every rerun. Cached on path and mtime.
+    """
+    path = resolve_image(image_url)
+    if path is None:
+        return None
+    try:
+        return _thumbnail_uri(str(path), path.stat().st_mtime, width)
+    except OSError:
+        return None
 
 
 def vehicle_photo_html(path: Path, height: int = CARD_HEIGHT) -> str:

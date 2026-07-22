@@ -21,7 +21,7 @@
         "merchandising_start_date": "2026-06-19",
         "status": "ACTIVE",
         "campaign_participation": [],
-        "image_url": "assets/vehicles/toyota_rav4_2022.jpg"
+        "image_url": "assets/vehicles/2022_toyota_rav4_xle.jpg"
       },
       {
         "vehicle_id": "V-10002",
@@ -41,7 +41,7 @@
         "merchandising_start_date": "2026-06-11",
         "status": "ACTIVE",
         "campaign_participation": [],
-        "image_url": null
+        "image_url": "assets/vehicles/2021_honda_accord_ex.jpg"
       },
       {
         "vehicle_id": "V-10003",
@@ -61,7 +61,7 @@
         "merchandising_start_date": "2026-06-04",
         "status": "ACTIVE",
         "campaign_participation": [],
-        "image_url": null
+        "image_url": "assets/vehicles/2020_ford_f150_xlt.jpg"
       },
       {
         "vehicle_id": "V-10004",
@@ -81,7 +81,7 @@
         "merchandising_start_date": "2026-04-21",
         "status": "ACTIVE",
         "campaign_participation": [],
-        "image_url": null
+        "image_url": "assets/vehicles/2019_nissan_altima_sv.jpg"
       },
       {
         "vehicle_id": "V-10005",
@@ -101,7 +101,7 @@
         "merchandising_start_date": "2026-04-12",
         "status": "ACTIVE",
         "campaign_participation": [],
-        "image_url": null
+        "image_url": "assets/vehicles/2018_bmw_540i.jpg"
       },
       {
         "vehicle_id": "V-10006",
@@ -121,7 +121,7 @@
         "merchandising_start_date": "2026-05-24",
         "status": "ACTIVE",
         "campaign_participation": [],
-        "image_url": null
+        "image_url": "assets/vehicles/2023_chevrolet_bolt_euv_lt.jpg"
       },
       {
         "vehicle_id": "V-10007",
@@ -141,7 +141,7 @@
         "merchandising_start_date": "2026-06-26",
         "status": "ACTIVE",
         "campaign_participation": [],
-        "image_url": null
+        "image_url": "assets/vehicles/2022_toyota_rav4_xle_v10007.jpg"
       },
       {
         "vehicle_id": "V-10008",
@@ -161,7 +161,7 @@
         "merchandising_start_date": "2026-06-21",
         "status": "ACTIVE",
         "campaign_participation": [],
-        "image_url": null
+        "image_url": "assets/vehicles/2021_subaru_outback_premium.jpg"
       },
       {
         "vehicle_id": "V-10009",
@@ -181,7 +181,7 @@
         "merchandising_start_date": "2026-06-15",
         "status": "ACTIVE",
         "campaign_participation": [],
-        "image_url": null
+        "image_url": "assets/vehicles/2017_ram_1500_rebel.jpg"
       },
       {
         "vehicle_id": "V-10010",
@@ -201,7 +201,7 @@
         "merchandising_start_date": "2026-06-29",
         "status": "ACTIVE",
         "campaign_participation": [],
-        "image_url": null
+        "image_url": "assets/vehicles/2022_kia_telluride_ex.jpg"
       },
       {
         "vehicle_id": "V-10011",
@@ -223,7 +223,7 @@
         "campaign_participation": [
           "CAMP-JUNE-2026"
         ],
-        "image_url": null
+        "image_url": "assets/vehicles/2020_toyota_camry_le.jpg"
       },
       {
         "vehicle_id": "V-10012",
@@ -243,10 +243,10 @@
         "merchandising_start_date": "2026-03-18",
         "status": "ACTIVE",
         "campaign_participation": [],
-        "image_url": null
+        "image_url": "assets/vehicles/2019_jeep_wrangler_sport.jpg"
       }
     ],
-    "_note_image_url": "image_url is a repository-relative path, resolved against the repo root rather than the working directory, and read from disk so the demo works offline. Only V-10001 carries a photo (CC0; see assets/vehicles/ATTRIBUTION.md); the rest are null and fall back to a generated body-style silhouette. A real vAuto integration would populate every row from the merchandising record."
+    "_note_image_url": "Every vehicle carries a repository-relative image_url, resolved against the repo root rather than the working directory and read from disk so the demo works offline. Licensing and provenance for each file is in assets/vehicles/ATTRIBUTION.md. The generated silhouette in ui_components.py remains the fallback for a record whose image is absent or unreadable."
   },
   "meta": {
     "source": "VAUTO",

@@ -13,8 +13,10 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from pricing_agent.mcp_clients import EventClient, MockTransport
+from pricing_agent.mcp_clients import EventClient, MockTransport, VautoClient
 from pricing_agent.skills.promotion_planner import plan_event
+
+import ui_components
 
 AS_OF = datetime(2026, 7, 21, 14, 0, tzinfo=timezone.utc)
 
@@ -33,6 +35,18 @@ def events(as_of: datetime) -> list[dict]:
 @st.cache_data(show_spinner=False)
 def plan(as_of: datetime, event_id: str, target: float) -> dict:
     return plan_event(MockTransport(as_of=as_of), event_id, target)
+
+
+@st.cache_data(show_spinner=False)
+def vehicles_by_id(as_of: datetime) -> dict[str, dict]:
+    inventory = VautoClient(MockTransport(as_of=as_of)).get_dealer_inventory().data
+    return {v["vehicle_id"]: v for v in inventory}
+
+
+def describe(vehicle: dict | None) -> str:
+    if not vehicle:
+        return ""
+    return f"{vehicle['year']} {vehicle['make']} {vehicle['model']}"
 
 
 FEASIBILITY_STYLE = {
@@ -216,10 +230,20 @@ actions = result["per_vehicle_actions"]
 chosen_plan = plans[recommended["plan_type"]]
 prices = {v["vehicle_id"]: v for v in chosen_plan["vehicles_selected"]}
 
+fleet = vehicles_by_id(AS_OF)
+PHOTO_COLUMN = st.column_config.ImageColumn("Photo", width="small")
+
+
+def _photo(vehicle_id: str) -> str | None:
+    return ui_components.thumbnail_uri((fleet.get(vehicle_id) or {}).get("image_url"))
+
+
 with promote_tab:
     rows = [
         {
+            "Photo": _photo(a["vehicle_id"]),
             "Stock": a["vehicle_id"],
+            "Vehicle": describe(fleet.get(a["vehicle_id"])),
             "Current": prices[a["vehicle_id"]]["current_list_price"],
             "Promotion price": a["promotion_price"],
             "Discount": prices[a["vehicle_id"]]["discount"],
@@ -232,8 +256,11 @@ with promote_tab:
         st.dataframe(
             pd.DataFrame(rows), hide_index=True,
             column_config={
-                c: st.column_config.NumberColumn(format="$%d")
-                for c in ("Current", "Promotion price", "Discount", "Min safe list")
+                "Photo": PHOTO_COLUMN,
+                **{
+                    c: st.column_config.NumberColumn(format="$%d")
+                    for c in ("Current", "Promotion price", "Discount", "Min safe list")
+                },
             },
         )
         st.caption("No promotion price falls below its minimum safe list price.")
@@ -241,13 +268,35 @@ with promote_tab:
         st.write("This plan promotes no vehicles.")
 
 with protect_tab:
-    rows = [{"Stock": a["vehicle_id"], "Why": a["reason"]} for a in actions if a["action"] == "PROTECT_PRICE"]
-    st.dataframe(pd.DataFrame(rows) if rows else pd.DataFrame([{"Stock": "—", "Why": "none"}]),
-                 hide_index=True)
+    rows = [
+        {
+            "Photo": _photo(a["vehicle_id"]),
+            "Stock": a["vehicle_id"],
+            "Vehicle": describe(fleet.get(a["vehicle_id"])),
+            "Why": a["reason"],
+        }
+        for a in actions
+        if a["action"] == "PROTECT_PRICE"
+    ]
+    if rows:
+        st.dataframe(pd.DataFrame(rows), hide_index=True,
+                     column_config={"Photo": PHOTO_COLUMN})
+    else:
+        st.write("No vehicles are being held back from this plan.")
 
 with exclude_tab:
-    rows = [{"Stock": a["vehicle_id"], "Reason": a["reason"]} for a in actions if a["action"] == "EXCLUDE"]
-    st.dataframe(pd.DataFrame(rows), hide_index=True)
+    rows = [
+        {
+            "Photo": _photo(a["vehicle_id"]),
+            "Stock": a["vehicle_id"],
+            "Vehicle": describe(fleet.get(a["vehicle_id"])),
+            "Reason": a["reason"],
+        }
+        for a in actions
+        if a["action"] == "EXCLUDE"
+    ]
+    st.dataframe(pd.DataFrame(rows), hide_index=True,
+                 column_config={"Photo": PHOTO_COLUMN})
     st.caption(
         "Every exclusion carries a reason — a plan is not reviewable if you cannot see "
         "what was left out. `NO_SAFE_HEADROOM` means the vehicle is already at or below "

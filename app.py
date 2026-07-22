@@ -17,6 +17,8 @@ from pricing_agent.config import load_config
 from pricing_agent.mcp_clients import MockTransport, VautoClient
 from pricing_agent.skills.inventory_portfolio import analyze
 
+import ui_components
+
 AS_OF = datetime(2026, 7, 21, 14, 0, tzinfo=timezone.utc)
 
 st.set_page_config(page_title="Used Vehicle Pricing Advisor", page_icon="🚗", layout="wide")
@@ -131,6 +133,9 @@ with lot_tab:
         action = actions.get(vid, {})
         rows.append(
             {
+                # Thumbnail rather than the full asset: a dozen full-size images inlined
+                # into a dataframe would push megabytes through every rerun.
+                "Photo": ui_components.thumbnail_uri(vehicle.get("image_url")),
                 "Action": ACTION_LABEL.get(action.get("action", ""), action.get("action", "")),
                 "Stock": vid,
                 "Vehicle": f"{vehicle['year']} {vehicle['make']} {vehicle['model']}",
@@ -149,6 +154,7 @@ with lot_tab:
     st.dataframe(
         frame, hide_index=True,
         column_config={
+            "Photo": st.column_config.ImageColumn("Photo", width="small"),
             "List price": st.column_config.NumberColumn(format="$%d"),
             "Risk": st.column_config.ProgressColumn(format="%.0f", min_value=0, max_value=100),
             "P(over 90d)": st.column_config.NumberColumn(format="%.0f%%"),
@@ -227,7 +233,12 @@ with risk_tab:
     for entry in result["top_risk_vehicles"][:6]:
         vehicle = next(v for v in vehicles if v["vehicle_id"] == entry["vehicle_id"])
         with st.container(border=True):
-            left, right = st.columns([2, 3])
+            photo, left, right = st.columns([1, 2, 3], vertical_alignment="center")
+            thumbnail = ui_components.thumbnail_uri(vehicle.get("image_url"), width=260)
+            if thumbnail:
+                photo.image(thumbnail, width="stretch")
+            else:
+                photo.caption("No photo")
             left.markdown(
                 f"**{vehicle['year']} {vehicle['make']} {vehicle['model']}**  \n"
                 f"{entry['vehicle_id']} · {vehicle['days_in_inventory']} days"
