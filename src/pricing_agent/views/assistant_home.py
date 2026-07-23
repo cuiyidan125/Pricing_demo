@@ -59,6 +59,11 @@ class WorkflowCard(NamedTuple):
     skills: tuple[str, ...]
 
 
+def md(text: str) -> str:
+    """Escape dollar signs so Streamlit does not read `$…$` as LaTeX."""
+    return str(text).replace("$", r"\$")
+
+
 def _money(value: object) -> str:
     try:
         return f"\\${float(value):,.0f}"
@@ -125,6 +130,13 @@ def render_assistant_home(
             # so it does not depend on the result being re-rendered before navigation.
             if response.resolved_vehicle_id:
                 st.session_state[SELECTED_VEHICLE_KEY] = response.resolved_vehicle_id
+            # Hand the aging orchestration result to its workspace so the page reflects the
+            # question actually asked, not just the canned demo scenario. Cleared on any
+            # non-aging query so a later visit to the workspace does not show a stale result.
+            if response.improve_aging is not None:
+                st.session_state["improve_aging_result"] = response.improve_aging
+            else:
+                st.session_state.pop("improve_aging_result", None)
         else:
             st.session_state.pop(RESPONSE_KEY, None)
             st.warning("Type a question first, or pick a workflow below.", icon="✍️")
@@ -159,6 +171,10 @@ def _render_response(response: AssistantResponse) -> None:
         AssistantState.AMBIGUOUS_MATCH: _render_ambiguous,
         AssistantState.WORKFLOW_NOT_YET_AVAILABLE: _render_not_available,
         AssistantState.EXECUTION_ERROR: _render_error,
+        # Phase 5 — Improve Aging orchestration states.
+        AssistantState.PARTIAL_RESULT: _render_executed,
+        AssistantState.TARGET_NOT_ACHIEVABLE: _render_executed,
+        AssistantState.NO_SAFE_ACTIONS: _render_clarification,
     }
     dispatch[response.state](response)
 
@@ -176,6 +192,49 @@ def _render_executed(response: AssistantResponse) -> None:
         _render_portfolio_result(response)
     elif response.workflow is WorkflowContext.MERCHANDISE_INVENTORY:
         _render_promotion_result(response)
+    elif response.workflow is WorkflowContext.IMPROVE_AGING_INVENTORY:
+        _render_improve_aging_result(response)
+
+
+def _render_improve_aging_result(response: AssistantResponse) -> None:
+    s = response.summary
+    icon = "✅" if response.state is AssistantState.ROUTED_AND_EXECUTED else "🚫"
+    st.markdown(f"{icon} **Improve Aging Inventory** — {md(response.message)}")
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Units on lot", s.get("current_inventory", "—"),
+              f"{s.get('current_utilization', 0):.0%} utilized", delta_color="off")
+    c2.metric("Aging candidates", s.get("candidate_count", 0),
+              f"{s.get('deep_analysed_count', 0)} analysed", delta_color="off")
+    c3.metric("Excluded / protected", s.get("excluded_count", 0))
+    target = s.get("target_status", "NO_EVENT")
+    c4.metric("Target", "No event" if target == "NO_EVENT" else target.replace("_", " ").title())
+
+    reduction = s.get("required_unit_reduction")
+    prob = s.get("probability_target_achieved")
+    bits = []
+    if reduction is not None:
+        bits.append(f"needs **{reduction}** incremental sale(s)")
+    if s.get("recommended_plan"):
+        bits.append(f"recommended plan **{s['recommended_plan'].replace('_', ' ').title()}**")
+    if prob is not None:
+        bits.append(f"hits target **{prob:.0%}** of the time")
+    if bits:
+        st.caption(" · ".join(bits))
+
+    counts = s.get("action_counts") or {}
+    if counts:
+        st.caption("Actions: " + " · ".join(
+            f"{k.replace('_', ' ').title()} {v}" for k, v in counts.items()))
+    if s.get("approvals_required"):
+        st.caption(f"⚠️ {s['approvals_required']} approval(s) required before anything moves.")
+
+    _render_warnings(response)
+
+    if response.target_url:
+        _open_workflow_link(response.target_url, "Open the full Improve Aging workspace →")
+        st.caption("The workspace shows the diagnosis, per-vehicle evidence, plan comparison, "
+                   "and the execution trace for this request.")
 
 
 def _render_pricing_result(response: AssistantResponse) -> None:

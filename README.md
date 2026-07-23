@@ -50,7 +50,7 @@ use.
 ### Tests
 
 ```bash
-python -m pytest tests -q            # 350 tests
+python -m pytest tests -q            # 387 tests
 python scripts/validate_schemas.py   # 62 checks: schemas, refs, fixtures, scenarios
 ```
 
@@ -95,7 +95,7 @@ copied from the skill result, never generated.
 "What should I price 2020 Ford F-150 XLT?"   → resolves V-10003 → single-vehicle valuation → result
 "What will my inventory look like in 30 days?" → inventory portfolio forecast → result
 "Plan the Summer Clearance event to reach 70%" → dealer event promotion planner → result
-"Which aging vehicles should I promote?"       → routed to Improve Aging → not executed yet
+"Reduce inventory utilization to 70% during Summer Clearance" → Improve Aging orchestration → plan
 ```
 
 It answers with one of six honest states: routed-and-executed, needs-clarification (which
@@ -103,8 +103,15 @@ vehicle?), no-match (not in inventory — it will not invent one), ambiguous-mat
 the candidates), workflow-not-yet-available (Improve Aging orchestration), or
 execution-error. See `docs/deterministic-agent-routing-results.md`.
 
-**Still not built, and the UI says so:** LLM-based routing, and Improve Aging
-orchestration (which would coordinate all three skills).
+**Improve Aging Inventory** is the orchestration that proves the architecture: it is **not a
+fourth skill** but a workflow that runs the three skills in order — portfolio forecast →
+candidate selection → single-vehicle valuation for the aged cohort → promotion plan when a
+real event is named → one consolidated action plan. It adds no arithmetic of its own, and it
+keeps each skill's simulation separate: percentiles from different simulations are shown side
+by side, never summed. See `docs/improve-aging-orchestration-results.md`.
+
+**Still not built, and the UI says so:** LLM-based routing (the deterministic router stands
+in for it).
 
 ---
 
@@ -124,7 +131,8 @@ src/pricing_agent/
     policy/       warnings, floors, approvals, freshness — runs last, adds only
     skills/       orchestration
     agents/, llm/ intake and explanation
-    workflows/    the dealer-workflow registry — one declaration of what the product offers
+    workflows/    the dealer-workflow registry, plus the Improve Aging orchestration
+                  (candidate_selection + improve_aging) that coordinates the three skills
     agents/       deterministic router, vehicle resolver, and assistant orchestrator
     views/        Streamlit render functions, bound to a workflow by the registry
 tests/      unit, schema, integration, plus 37 scenario definitions

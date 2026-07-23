@@ -276,11 +276,15 @@ def test_assistant_offers_four_suggested_prompts_that_route():
         assert fragment in joined
 
 
-def test_improve_aging_page_fabricates_no_output():
+def test_improve_aging_page_renders_the_orchestration_not_a_shell():
+    """Phase 5: the page is now an evidence workspace driven by the orchestration engine.
+    It must render through the workflow, not re-call skills directly, and not compute."""
     source = (VIEWS / "improve_aging.py").read_text(encoding="utf-8")
-    assert "next phase" in source
-    for banned in ("pricing_agent.skills", "analyze(", "plan_event("):
-        assert banned not in source, "the placeholder must not invoke a skill"
+    assert "run_improve_aging" in source, "the page runs the orchestration"
+    # It renders the workflow's result; it does not itself invoke the skills or the engine.
+    for banned in ("pricing_agent.skills", "single_vehicle.analyze", "plan_event(",
+                   "import numpy", "percentile"):
+        assert banned not in source, f"the workspace must not reference {banned}"
 
 
 # --- legacy navigation is gone --------------------------------------------------------
