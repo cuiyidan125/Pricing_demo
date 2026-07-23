@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import streamlit as st
 
+from pricing_agent.views.workflow_copy import render_workflow_header
 from pricing_agent.workflows.context import WorkflowContext
 
 STEPS = (
@@ -55,10 +56,16 @@ STEPS = (
 
 def render_improve_aging(workflow_context: WorkflowContext | None = None) -> None:
     """Render the Improve Aging Inventory landing page."""
-    st.title("Improve Aging Inventory")
+    render_workflow_header(
+        workflow_context,
+        fallback_title="Improve Aging Inventory",
+        fallback_subtitle=(
+            "Coordinate portfolio forecasting, single-vehicle diagnostics, and event "
+            "promotion planning against the aged cohort."
+        ),
+    )
     st.caption(
-        "Coordinates the three existing capabilities against one job: getting aged units "
-        "off the lot without breaking a price floor."
+        "One job: getting aged units off the lot without breaking a price floor."
     )
 
     st.warning(

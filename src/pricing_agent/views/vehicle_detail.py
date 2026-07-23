@@ -21,6 +21,7 @@ from pricing_agent.llm import credentials_present, explain
 from pricing_agent.mcp_clients import MockTransport, VautoClient
 from pricing_agent.policy.price_floor import can_publish
 from pricing_agent.skills.single_vehicle import analyze
+from pricing_agent.views.workflow_copy import render_workflow_header
 from pricing_agent.workflows.context import WorkflowContext
 
 import ui_components
@@ -63,9 +64,13 @@ def analyze_vehicle(vehicle_id: str, as_of: datetime) -> dict:
 def render_vehicle_detail(workflow_context: WorkflowContext | None = None) -> None:
     """Render the vehicle detail screen.
 
-    `workflow_context` is accepted and ignored. Phase 2 is a pure refactor; the parameter
-    exists so Phase 3 can bind it through `st.Page` without touching this signature again.
+    `workflow_context` selects the page copy and nothing else — the recommendation, the
+    floor and every figure below are computed identically without it.
     """
+    copy = render_workflow_header(workflow_context)
+    if copy is not None and copy.instruction is not None:
+        st.caption(copy.instruction)
+
     inventory = load_inventory(AS_OF)
     labels = {
         f"{v['vehicle_id']} · {v['year']} {v['make']} {v['model']} · {v['days_in_inventory']}d": v[
@@ -74,7 +79,17 @@ def render_vehicle_detail(workflow_context: WorkflowContext | None = None) -> No
         for v in inventory
     }
 
-    choice = st.sidebar.selectbox("Vehicle", list(labels), index=0)
+    # If the assistant routed a vehicle here, preselect it once by seeding the widget's own
+    # state before the widget is created — the supported way to set a default. It is popped
+    # so a later manual change in the selectbox wins and is not overridden on the next run.
+    routed_id = st.session_state.pop("assistant_selected_vehicle_id", None)
+    if routed_id is not None:
+        for label, vid in labels.items():
+            if vid == routed_id:
+                st.session_state["vehicle_detail_choice"] = label
+                break
+
+    choice = st.sidebar.selectbox("Vehicle", list(labels), key="vehicle_detail_choice")
     vehicle_id = labels[choice]
 
     with st.spinner("Analyzing…"):
@@ -120,7 +135,10 @@ def render_vehicle_detail(workflow_context: WorkflowContext | None = None) -> No
             )
 
     with title_column:
-        st.title(
+        # The page heading belongs to the workflow when one is bound, so the vehicle
+        # becomes the subject beneath it rather than a competing <h1>.
+        vehicle_heading = st.header if copy is not None else st.title
+        vehicle_heading(
             f"{vehicle['year']} {vehicle['make']} {vehicle['model']} {vehicle['trim'] or ''}".strip()
         )
         st.caption(

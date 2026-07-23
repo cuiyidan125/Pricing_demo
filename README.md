@@ -50,7 +50,7 @@ use.
 ### Tests
 
 ```bash
-python -m pytest tests -q            # 225 tests
+python -m pytest tests -q            # 350 tests
 python scripts/validate_schemas.py   # 62 checks: schemas, refs, fixtures, scenarios
 ```
 
@@ -83,14 +83,28 @@ Dealer Workflows
   Improve Aging Inventory      coordinates all three skills against aged units
 ```
 
-Two things the shell does **not** yet do, and says so on screen:
+### The assistant routes and executes — deterministically
 
-- **The assistant does not route natural language.** It captures the question, holds it in
-  session state, and tells you routing is not connected. No model is called from that box.
-- **Improve Aging Inventory does not orchestrate.** It describes the six-step sequence and
-  which capability serves each step. It runs none of them and fabricates no output.
+Ask a question in plain words and the assistant classifies it, resolves the named vehicle
+against real inventory, runs **one** skill, and shows a concise result with a link into the
+full workspace. **No model is involved** — routing, entity extraction, and vehicle
+resolution are rules over strings (`src/pricing_agent/agents/`), and every number shown is
+copied from the skill result, never generated.
 
-Both are the next phase of work. See `docs/workflow-navigation-results.md`.
+```
+"What should I price 2020 Ford F-150 XLT?"   → resolves V-10003 → single-vehicle valuation → result
+"What will my inventory look like in 30 days?" → inventory portfolio forecast → result
+"Plan the Summer Clearance event to reach 70%" → dealer event promotion planner → result
+"Which aging vehicles should I promote?"       → routed to Improve Aging → not executed yet
+```
+
+It answers with one of six honest states: routed-and-executed, needs-clarification (which
+vehicle?), no-match (not in inventory — it will not invent one), ambiguous-match (pick from
+the candidates), workflow-not-yet-available (Improve Aging orchestration), or
+execution-error. See `docs/deterministic-agent-routing-results.md`.
+
+**Still not built, and the UI says so:** LLM-based routing, and Improve Aging
+orchestration (which would coordinate all three skills).
 
 ---
 
@@ -111,6 +125,7 @@ src/pricing_agent/
     skills/       orchestration
     agents/, llm/ intake and explanation
     workflows/    the dealer-workflow registry — one declaration of what the product offers
+    agents/       deterministic router, vehicle resolver, and assistant orchestrator
     views/        Streamlit render functions, bound to a workflow by the registry
 tests/      unit, schema, integration, plus 37 scenario definitions
 ```

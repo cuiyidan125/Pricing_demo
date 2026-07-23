@@ -19,6 +19,7 @@ import streamlit as st
 from pricing_agent.config import load_config
 from pricing_agent.mcp_clients import MockTransport, VautoClient
 from pricing_agent.skills.inventory_portfolio import analyze
+from pricing_agent.views.workflow_copy import render_workflow_header
 from pricing_agent.workflows.context import WorkflowContext
 
 import ui_components
@@ -69,13 +70,15 @@ SEVERITY_KIND = {
 def render_dashboard(workflow_context: WorkflowContext | None = None) -> None:
     """Render the inventory dashboard.
 
-    `workflow_context` is accepted and ignored. Phase 2 is a pure refactor; the parameter
-    exists so Phase 3 can bind it through `st.Page` without touching this signature again.
+    `workflow_context` selects the page copy and nothing else — every figure below is
+    computed the same way whichever workflow rendered it.
     """
     # --- header -----------------------------------------------------------------------
 
     config = load_config()
-    st.title("Used Vehicle Pricing Advisor")
+    copy = render_workflow_header(
+        workflow_context, fallback_title="Used Vehicle Pricing Advisor"
+    )
 
     target = st.sidebar.number_input(
         "30-day revenue target ($)", min_value=0, value=150_000, step=10_000,
@@ -103,6 +106,12 @@ def render_dashboard(workflow_context: WorkflowContext | None = None) -> None:
         f"DEALER-1001 · {result['inventory_summary']['active_count']} active units · "
         f"median {result['inventory_summary']['median_days_in_inventory']:.0f} days in inventory"
     )
+
+    if copy is not None:
+        if copy.instruction is not None:
+            st.caption(copy.instruction)
+        if copy.scope_note is not None:
+            st.info(copy.scope_note, icon="🎯")
 
     # --- KPI row ----------------------------------------------------------------------
 
@@ -172,7 +181,8 @@ def render_dashboard(workflow_context: WorkflowContext | None = None) -> None:
         st.caption(
             "Sorted by risk, which weights aging, depreciation, negative-value probability and "
             "**cost basis** — so a $45,000 unit at moderate risk outranks a $9,000 unit at high "
-            "risk. Open a vehicle from the sidebar for its price recommendation."
+            "risk. Open **Price Inventory** for any one of these to see its price "
+            "recommendation and floor."
         )
 
     # --- forecast ---------------------------------------------------------------------
