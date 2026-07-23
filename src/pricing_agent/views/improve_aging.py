@@ -54,6 +54,14 @@ BUSINESS_STEPS = (
 # Recommended-plan card ordering: conservative → recommended → aggressive.
 PLAN_STANCE = {"MARGIN_PROTECT": "Conservative", "BALANCED": "Balanced", "CAPACITY_FIRST": "Aggressive"}
 
+# Actions that ask the dealer to do something now. Everything else an analysed vehicle can be
+# assigned (NO_ACTION, PROTECT_PRICE) means "no immediate action". This is a display grouping of
+# the classification the workflow already made — it does not reclassify anything.
+_IMMEDIATE_ACTIONS = frozenset({
+    "REPRICE_NOW", "EVENT_PROMOTION", "MANAGER_REVIEW",
+    "WHOLESALE_OR_LOSS_MINIMIZATION_REVIEW",
+})
+
 
 def md(text: str) -> str:
     return str(text).replace("$", r"\$")
@@ -137,6 +145,35 @@ def executive_metrics(result) -> dict:
     }
 
 
+def reconciled_counts(result) -> dict:
+    """Reconcile the three counts the workspace shows, all read from the existing result.
+
+    The bug this addresses is conflation, not classification: the exec summary counted analysed
+    vehicles, the action table counted a filtered subset, and the approvals metric counted
+    approval *records*. This helper derives every count from the same result so the three agree.
+    Nothing here decides an action or recomputes a number — it only groups and counts what the
+    workflow already produced.
+    """
+    analysed_ids = [e.vehicle_id for e in result.vehicle_evidence]
+    action_by_id = {a["vehicle_id"]: a["recommended_action"] for a in result.consolidated_actions}
+    immediate = [vid for vid in analysed_ids if action_by_id.get(vid) in _IMMEDIATE_ACTIONS]
+    no_immediate = [vid for vid in analysed_ids if vid not in set(immediate)]
+    review_vehicle_ids = sorted(
+        {a.get("vehicle_id") for a in result.approvals_required if a.get("vehicle_id")}
+    )
+    return {
+        "analysed": len(analysed_ids),
+        "analysed_ids": analysed_ids,
+        "immediate_action": len(immediate),
+        "immediate_ids": immediate,
+        "no_immediate_action": len(no_immediate),
+        "no_immediate_ids": no_immediate,
+        "review_vehicles": len(review_vehicle_ids),
+        "review_vehicle_ids": review_vehicle_ids,
+        "review_items": len(result.approvals_required),
+    }
+
+
 def _executive_summary(result) -> None:
     m = executive_metrics(result)
     status = "No event" if m["target_status"] == "NO_EVENT" else T.feasibility_label(m["target_status"])
@@ -147,11 +184,23 @@ def _executive_summary(result) -> None:
                 _pct(m["target_utilization"]) if m["target_utilization"] is not None else "—")
     c[2].metric("Vehicles to sell or release",
                 m["required_unit_reduction"] if m["required_unit_reduction"] is not None else "—")
-    c[3].metric("Vehicles requiring action", m["candidate_count"])
+    rc = reconciled_counts(result)
+    c[3].metric("Aging vehicles analysed", rc["analysed"])
     prob = m["probability_target_achieved"]
     c[4].metric("Target likelihood", status,
                 _pct(prob) + " likely" if isinstance(prob, (int, float)) else None,
                 delta_color="off")
+
+    if rc["no_immediate_action"]:
+        st.caption(md(
+            f"Of {rc['analysed']} analysed, **{rc['immediate_action']}** need immediate action "
+            f"and **{rc['no_immediate_action']}** have no immediate action "
+            "(eligible for a sale event)."
+        ))
+    else:
+        st.caption(md(
+            f"All {rc['analysed']} analysed vehicles need immediate action."
+        ))
 
     statement = copy.recommendation_statement(result)
     if result.state is WorkflowState.TARGET_NOT_ACHIEVABLE:
@@ -283,7 +332,9 @@ def _recommended_plan(result) -> None:
                 f"lot capacity used {_pct(o['ending_utilization']['p50'])}", delta_color="off")
     c[1].metric("Likelihood of reaching the target", _pct(o["probability_target_achieved"]))
     c[2].metric("Expected gross impact (P50)", _usd(o["gross_impact"]["p50"]))
-    c[3].metric("Manager reviews required", len(result.approvals_required))
+    rc = reconciled_counts(result)
+    c[3].metric("Vehicles needing a manager review", rc["review_vehicles"],
+                f"{rc['review_items']} review item(s)", delta_color="off")
 
     c2 = st.columns(3)
     hs = (d.get("expected_holding_cost_savings") or {}).get("p50")
@@ -304,16 +355,19 @@ def _recommended_plan(result) -> None:
 
 
 def _vehicles_requiring_action(result) -> None:
-    st.subheader("Vehicles requiring action")
+    st.subheader("Analysed aging vehicles")
     evidence_by_id = {e.vehicle_id: e for e in result.vehicle_evidence}
-    acting = [a for a in result.consolidated_actions
-              if a["recommended_action"] not in ("PROTECT_PRICE", "NO_ACTION")]
-    if not acting:
-        st.caption("No vehicle needs an action in this run.")
+    analysed_ids = set(evidence_by_id)
+    # Show every vehicle that was analysed in depth, in the workflow's own attention order —
+    # including the ones with no immediate action, which the old filter dropped. The excluded
+    # and protected vehicles keep their own section below.
+    shown = [a for a in result.consolidated_actions if a["vehicle_id"] in analysed_ids]
+    if not shown:
+        st.caption("No vehicle was analysed in depth in this run.")
         return
 
     rows = []
-    for a in acting:
+    for a in shown:
         ev = evidence_by_id.get(a["vehicle_id"])
         res = ev.result if ev else {}
         scenario = {}
@@ -323,18 +377,30 @@ def _vehicles_requiring_action(result) -> None:
                              if s["strategy"] == strat), {})
         be = res.get("break_even_analysis", {})
         days = (scenario.get("additional_days_to_sale") or {})
+        immediate = a["recommended_action"] in _IMMEDIATE_ACTIONS
+        # An analysed candidate with no immediate action was still worth surfacing: without a sale
+        # event it holds its strategy, but it is eligible for one. This is a display label for the
+        # existing NO_ACTION/PROTECT_PRICE classification, not a reclassification.
+        action_text = (copy.action_label(a["recommended_action"]) if immediate
+                       else "No immediate action — eligible for a sale event")
         rows.append({
             "Vehicle": ev.description if ev else a["vehicle_id"],
-            "Recommended action": copy.action_label(a["recommended_action"]),
-            "Why action is needed": ", ".join(copy.selection_label(c) for c in a["reason_codes"]),
+            "Attention": "Immediate action" if immediate else "No immediate action",
+            "Recommended action": action_text,
+            "Why it was analysed": ", ".join(copy.selection_label(c) for c in a["reason_codes"]),
             "Current asking price": a.get("current_price"),
             "Expected days to sale (P50)": days.get("p50"),
             "Conservative days to sale (P90)": days.get("p90"),
             "Break-even price": be.get("current_accounting_break_even"),
             "Approval needed": "Yes" if a["approvals_required"] else "No",
         })
-    st.caption("The aged vehicles to act on, ordered by attention. Each row is a separate "
-               "single-vehicle analysis — shown side by side, never combined.")
+    rc = reconciled_counts(result)
+    st.caption(
+        f"All {rc['analysed']} vehicles analysed in depth — "
+        f"{rc['immediate_action']} need immediate action, "
+        f"{rc['no_immediate_action']} have no immediate action. Each row is a separate "
+        "single-vehicle analysis, shown side by side, never combined."
+    )
     st.dataframe(
         pd.DataFrame(rows), hide_index=True,
         column_config={
@@ -349,10 +415,11 @@ def _vehicles_requiring_action(result) -> None:
             pd.DataFrame([
                 {"Vehicle": (evidence_by_id.get(a["vehicle_id"]).description
                              if a["vehicle_id"] in evidence_by_id else a["vehicle_id"]),
+                 "Recommended action": a["recommended_action"],
                  "Reason codes": ", ".join(a["reason_codes"]),
                  "request_id": a["referenced_request_id"] or "—",
                  "simulation_id": a["referenced_simulation_id"] or "—"}
-                for a in acting
+                for a in shown
             ]),
             hide_index=True,
         )
@@ -453,7 +520,11 @@ def _plan_comparison(result) -> None:
 def _warnings_and_approvals(result) -> None:
     st.subheader("What to review, and manager reviews required")
     if result.approvals_required:
-        st.caption("These recommendations require a manager review before anything changes.")
+        rc = reconciled_counts(result)
+        st.caption(
+            f"**{rc['review_vehicles']}** vehicle(s) need a manager review before anything "
+            f"changes, carrying **{rc['review_items']}** individual review item(s) in total."
+        )
         by_vehicle: dict[str, list[str]] = {}
         for a in result.approvals_required:
             kind = a.get("approval_type") or a.get("type") or "REVIEW"
