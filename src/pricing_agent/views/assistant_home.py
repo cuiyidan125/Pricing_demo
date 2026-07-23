@@ -24,7 +24,7 @@ from typing import Iterable, NamedTuple
 
 import streamlit as st
 
-from pricing_agent.agents import run_assistant
+from pricing_agent.agents import build_aging_answer, run_assistant
 from pricing_agent.agents.assistant import AssistantResponse, AssistantState
 from pricing_agent.views import terminology as T
 from pricing_agent.workflows.context import WorkflowContext
@@ -198,12 +198,21 @@ def _render_executed(response: AssistantResponse) -> None:
 
 
 def _render_improve_aging_result(response: AssistantResponse) -> None:
-    """A concise chat summary — enough to grasp the answer without scrolling. The full
-    dashboard lives on the workspace page, linked below."""
+    """The direct, grounded answer — the actual vehicles and their recommended actions, in the
+    conversation. The full evidence, plan comparison, and audit live on the workspace, linked
+    at the end. Every value is read from the structured result; nothing is computed here."""
     s = response.summary
     icon = "✅" if response.state is AssistantState.ROUTED_AND_EXECUTED else "🚫"
     st.markdown(f"{icon} **Improve Aging Inventory** — {md(response.message)}")
 
+    answer = build_aging_answer(response.improve_aging, workspace_url=response.target_url)
+    if answer is None:
+        # No deep analysis available (e.g. an unresolved event stopped the workflow early).
+        if response.target_url:
+            _open_workflow_link(response.target_url, "Open the full Improve Aging workspace →")
+        return
+
+    # A compact orientation row, then the actual answer.
     target = s.get("target_status", "NO_EVENT")
     util, tgt = s.get("current_utilization"), s.get("target_utilization")
     c1, c2, c3 = st.columns(3)
@@ -215,37 +224,88 @@ def _render_improve_aging_result(response: AssistantResponse) -> None:
     )
     c2.metric("Target likelihood",
               "No event" if target == "NO_EVENT" else T.feasibility_label(target))
-    analysed = s.get("deep_analysed_count", s.get("candidate_count", 0))
-    immediate = s.get("immediate_action_count")
-    c3.metric("Aging vehicles analysed", analysed,
-              (f"{immediate} need action now" if isinstance(immediate, int) else None),
-              delta_color="off")
+    c3.metric("Aging vehicles analysed", answer.analysed_count,
+              f"{answer.immediate_count} need action now", delta_color="off")
 
-    bits = []
+    st.markdown(f"**{md(answer.understood)}**")
+
+    if answer.immediate:
+        st.markdown(f"**{answer.immediate_count} need immediate action:**")
+        for v in answer.immediate:
+            st.markdown(
+                f"- **{md(v.description)}** — {md(v.action_label)}  \n"
+                f"  _Reason: {md(v.reason)}_"
+            )
+
+    if answer.no_immediate:
+        st.markdown(
+            f"**{answer.no_immediate_count} do not need immediate action "
+            "but may be sale-event candidates:**"
+        )
+        for v in answer.no_immediate:
+            st.markdown(f"- {md(v.description)}")
+
+    if answer.event_selected and answer.event_block:
+        _render_event_block(answer.event_block)
+    else:
+        st.info(md(answer.promotion_note), icon="🗓️")
+
+    # Default review copy is vehicle-based — the raw record count lives in the audit expander.
+    if answer.review_vehicle_count:
+        st.caption(f"🔍 {md(answer.key_review_note)}")
     if s.get("recommended_plan"):
-        bits.append(f"recommended approach **{T.plan_name(s['recommended_plan'])}**")
-    prob = s.get("probability_target_achieved")
-    if isinstance(prob, (int, float)):
-        bits.append(f"reaches the target **{prob:.0%}** of the time")
-    review_vehicles = s.get("review_vehicle_count")
-    review_items = s.get("review_item_count", s.get("approvals_required"))
-    if review_vehicles:
-        bits.append(f"**{review_vehicles}** vehicle(s) need a manager review "
-                    f"({review_items} review item(s))")
-    elif s.get("approvals_required"):
-        bits.append(f"**{s['approvals_required']}** manager review item(s) required")
-    if bits:
-        st.caption(" · ".join(bits))
+        st.caption(f"Recommended approach **{T.plan_name(s['recommended_plan'])}**.")
 
     # Top one or two warnings only — the workspace shows the full set.
     for warning in response.warnings[:2]:
         st.caption(f"⚠️ {md(T.warning_label(warning.get('code', '')))} — "
                    f"{md(str(warning.get('message', '')))[:110]}")
 
+    _render_approval_details(answer)
+
+    if answer.suggested_followups:
+        st.markdown("**You could ask next:**")
+        for q in answer.suggested_followups:
+            st.markdown(f"- _{md(q)}_")
+
     if response.target_url:
         _open_workflow_link(response.target_url, "Open the full Improve Aging workspace →")
         st.caption("The workspace shows the diagnosis, per-vehicle evidence, plan comparison, "
                    "and the execution trace for this request.")
+
+
+def _render_event_block(block) -> None:
+    """The extra distinctions a selected event makes — promoted vs analysed-not-selected vs
+    protected/excluded, plus target likelihood and the recommended approach."""
+    if block.promoted:
+        st.markdown(f"**{len(block.promoted)} recommended for the "
+                    f"{md(block.event_name or 'sale')} event:**")
+        for v in block.promoted:
+            st.markdown(f"- {md(v.description)}")
+    if block.probability_target_achieved is not None:
+        st.caption(
+            f"Target likelihood **{T.feasibility_label(block.target_status or '')}** — "
+            f"reaches the target **{block.probability_target_achieved:.0%}** of the time. "
+            "A plan improves the odds; it does not guarantee sales."
+        )
+
+
+def _render_approval_details(answer) -> None:
+    """Progressive disclosure: the default surfaces show only the unique vehicle count. The raw
+    review-condition record count and the per-vehicle breakdown live here, in the audit view."""
+    if not answer.review_vehicle_count:
+        return
+    with st.expander("View approval details"):
+        st.markdown(
+            f"- **Vehicles requiring review:** {answer.review_vehicle_count}\n"
+            f"- **Vehicles assigned to manager review:** {answer.manager_review_count}\n"
+            f"- **Review conditions triggered:** {answer.review_item_count}"
+        )
+        st.caption(
+            "“Review conditions triggered” counts the individual approval-condition records "
+            "behind these vehicles — not separate dealer decisions. The workspace lists each "
+            "condition with its raw code and the vehicle it belongs to."
+        )
 
 
 def _render_pricing_result(response: AssistantResponse) -> None:

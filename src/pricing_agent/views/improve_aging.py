@@ -333,8 +333,8 @@ def _recommended_plan(result) -> None:
     c[1].metric("Likelihood of reaching the target", _pct(o["probability_target_achieved"]))
     c[2].metric("Expected gross impact (P50)", _usd(o["gross_impact"]["p50"]))
     rc = reconciled_counts(result)
-    c[3].metric("Vehicles needing a manager review", rc["review_vehicles"],
-                f"{rc['review_items']} review item(s)", delta_color="off")
+    # Vehicle-based by default; the raw review-condition count lives in "View approval details".
+    c[3].metric("Vehicles requiring review", rc["review_vehicles"])
 
     c2 = st.columns(3)
     hs = (d.get("expected_holding_cost_savings") or {}).get("p50")
@@ -518,12 +518,18 @@ def _plan_comparison(result) -> None:
 
 
 def _warnings_and_approvals(result) -> None:
-    st.subheader("What to review, and manager reviews required")
+    st.subheader("What to review before pricing changes")
     if result.approvals_required:
         rc = reconciled_counts(result)
+        manager_review = sum(1 for a in result.consolidated_actions
+                             if a["recommended_action"] == "MANAGER_REVIEW")
+        # Default copy is vehicle-based. The raw review-condition record count (and the raw
+        # records themselves) move into "View approval details" below — showing it here by
+        # default reads as if the dealer must complete that many separate approvals.
         st.caption(
-            f"**{rc['review_vehicles']}** vehicle(s) need a manager review before anything "
-            f"changes, carrying **{rc['review_items']}** individual review item(s) in total."
+            f"**{rc['review_vehicles']}** vehicle(s) require review before any pricing action — "
+            f"**{manager_review}** assigned to manager review, the rest flagged for wholesale / "
+            "loss-minimization review."
         )
         by_vehicle: dict[str, list[str]] = {}
         for a in result.approvals_required:
@@ -537,6 +543,26 @@ def _warnings_and_approvals(result) -> None:
             ]),
             hide_index=True,
         )
+        with st.expander("View approval details"):
+            st.markdown(
+                f"- **Vehicles requiring review:** {rc['review_vehicles']}\n"
+                f"- **Vehicles assigned to manager review:** {manager_review}\n"
+                f"- **Review conditions triggered:** {rc['review_items']}"
+            )
+            st.caption(
+                "“Review conditions triggered” counts the individual approval-condition records "
+                "behind these vehicles — not separate dealer decisions. Each raw record, with the "
+                "vehicle and simulation it came from, is listed below."
+            )
+            st.dataframe(
+                pd.DataFrame([
+                    {"Vehicle": a.get("vehicle_id") or "—",
+                     "Review condition (raw code)": a.get("approval_type") or a.get("type") or "REVIEW",
+                     "Source skill": a.get("source") or "—"}
+                    for a in result.approvals_required
+                ]),
+                hide_index=True,
+            )
     else:
         st.caption("No manager reviews required.")
 

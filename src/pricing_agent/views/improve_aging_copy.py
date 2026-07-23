@@ -167,13 +167,18 @@ def next_steps(result) -> list[NextAction]:
         steps.append(NextAction(
             "Decide on the target", detail, "feasibility.alternatives"))
 
-    # 2. Vehicles that cannot move without a signature — a safety gate.
+    # 2. Vehicles that cannot move without a signature — a safety gate. The dealer-facing count
+    # is the number of vehicles requiring review, never the raw approval-record count (that lives
+    # in "View approval details"); the manager-review action count is a distinct, smaller figure.
     review = counts.get("MANAGER_REVIEW", 0)
+    review_vehicles = len({a.get("vehicle_id") for a in result.approvals_required
+                           if a.get("vehicle_id")})
     if review or approvals:
         steps.append(NextAction(
-            f"Review {review} vehicle(s) needing manager approval",
-            f"{approvals} approval(s) are required before any of these prices change.",
-            "consolidated_actions[MANAGER_REVIEW] + approvals_required"))
+            f"Review {review} vehicle(s) assigned to manager review",
+            f"{review_vehicles} vehicle(s) have review conditions to clear before any price "
+            "changes.",
+            "consolidated_actions[MANAGER_REVIEW] + distinct approvals_required vehicles"))
 
     # 3. The deeply aged, underwater units.
     wholesale = counts.get("WHOLESALE_OR_LOSS_MINIMIZATION_REVIEW", 0)

@@ -464,6 +464,10 @@ def _improve_aging_summary(result) -> dict:
     action_by_id = {a["vehicle_id"]: a["recommended_action"] for a in result.consolidated_actions}
     immediate_count = sum(1 for vid in analysed_ids if action_by_id.get(vid) in _immediate)
     review_vehicle_ids = {a.get("vehicle_id") for a in result.approvals_required if a.get("vehicle_id")}
+    # Vehicles whose *final action* is specifically MANAGER_REVIEW — a distinct, smaller concept
+    # than "vehicles with review conditions" (which also includes wholesale-review vehicles).
+    manager_review_count = sum(
+        1 for a in result.consolidated_actions if a["recommended_action"] == "MANAGER_REVIEW")
     return {
         "workflow": "Improve Aging Inventory",
         "current_inventory": diag.get("current_inventory"),
@@ -476,6 +480,7 @@ def _improve_aging_summary(result) -> dict:
         "immediate_action_count": immediate_count,
         "no_immediate_action_count": len(analysed_ids) - immediate_count,
         "review_vehicle_count": len(review_vehicle_ids),
+        "manager_review_count": manager_review_count,
         "review_item_count": len(result.approvals_required),
         "excluded_count": len(selection.exclusions) if selection else 0,
         "required_unit_reduction": diag.get("required_unit_reduction"),
