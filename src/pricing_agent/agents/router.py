@@ -130,8 +130,9 @@ PORTFOLIO_TERMS = re.compile(
 )
 
 PRICING_TERMS = re.compile(
-    r"\b(price|pricing|re[\s-]?price|worth|value|valuation|list it|how much.*(sell|list|"
-    r"ask|worth)|what.*worth)\b"
+    r"\b(price|pricing|re[\s-]?price|revalue|re[\s-]?valuation|worth|value|valuation|"
+    r"apprais(?:e|al)|priced|list price|list it|how much.*(sell|list|ask|worth)|"
+    r"what.*worth|what should i list)\b"
 )
 
 

@@ -24,8 +24,10 @@ from datetime import datetime
 
 from pricing_agent.agents.aging_answer import IMMEDIATE_ACTIONS, build_aging_answer
 from pricing_agent.agents.assistant import (
+    AssistantState,
     parse_explicit_target,
     resolve_event,
+    run_assistant,
     wrap_improve_aging,
 )
 from pricing_agent.agents.conversation import (
@@ -34,14 +36,26 @@ from pricing_agent.agents.conversation import (
     SOURCE_EXPLANATION,
     SOURCE_FILTERED,
     SOURCE_RERUN,
+    SOURCE_SWITCH,
     SOURCE_UNSUPPORTED,
     ConversationState,
     VehicleRef,
     resolve_reference,
     vehicle_index,
 )
+from pricing_agent.agents.router import route
 from pricing_agent.mcp_clients import EventClient, MockTransport
+from pricing_agent.workflows.context import WorkflowContext
 from pricing_agent.workflows.improve_aging import WorkflowState, run_improve_aging
+
+# Explicit aging-intent words: when present, a message stays a follow-up to the active aging
+# result even if it brushes a pricing word — the action asked for is about the aging analysis.
+_AGING_INTENT = re.compile(
+    r"\b(why|selected|aging|wholesale|manager[\s-]?review|break[\s-]?even|days on lot|"
+    r"included in|promotion candidate|review condition|no[\s-]?immediate|not need immediate)\b",
+    re.IGNORECASE)
+
+_THIS_VEHICLE = re.compile(r"\bthis vehicle\b|\bthis one\b|\bit\b", re.IGNORECASE)
 
 # --- signals --------------------------------------------------------------------------
 
@@ -131,16 +145,42 @@ def handle_followup(text: str, state: ConversationState, *, as_of: datetime) -> 
             "example, \"Which aging vehicles should I promote?\"", success=False)
         return _record(state, result)
 
-    handlers = (_unsupported, _rerun, _clarification, _filter, _explain)
-    for handler in handlers:
-        result = handler(text, state, as_of)
-        if result is not None:
-            return _record(state, result)
-    return _record(state, _fallback(state))
+    # Unavailable data and price-publishing are refused first — they are neither a workflow switch
+    # nor a follow-up, and "publish the price" must never be read as a valuation intent.
+    unsupported = _unsupported(text, state, as_of)
+    if unsupported is not None:
+        return _record(state, unsupported)
+
+    # New-workflow intent is checked *before* follow-up classification, so a pricing request is
+    # never forced into the active aging result just because the vehicle appears there.
+    routed = detect_new_workflow(text, state)
+    if routed is not None:
+        return _record(state, _switch_workflow(text, state, routed, as_of))
+
+    if state.active_workflow_type == "IMPROVE_AGING_INVENTORY":
+        handlers = (_rerun, _clarification, _filter, _explain)
+        for handler in handlers:
+            result = handler(text, state, as_of)
+            if result is not None:
+                return _record(state, result)
+        return _record(state, _fallback(state))
+
+    # Active workflow is not the multi-turn aging result (e.g. a valuation the user switched to).
+    return _record(state, _non_aging_followup(state))
 
 
 def _record(state: ConversationState, result: FollowupResult) -> FollowupResult:
     """Append the assistant turn and update reference memory / active result."""
+    if result.kind == SOURCE_SWITCH and result.success and result.response is not None:
+        # Preserve the current workflow in history, then adopt the new one — active is replaced
+        # only here, after the new workflow has succeeded.
+        state.switch_to(result.response)
+        if result.referenced_ids:
+            state.last_referenced_vehicle_ids = result.referenced_ids
+        state.add_assistant(result.text, SOURCE_SWITCH, result=state.active_result,
+                            response=result.response, referenced=result.referenced_ids,
+                            workflow_id=state.active_workflow_id)
+        return result
     if result.referenced_ids:
         state.last_referenced_vehicle_ids = result.referenced_ids
     if result.reran and result.success and result.response is not None:
@@ -159,6 +199,116 @@ def _record(state: ConversationState, result: FollowupResult) -> FollowupResult:
     state.add_assistant(result.text, result.kind, referenced=result.referenced_ids,
                         workflow_id=state.active_workflow_id)
     return result
+
+
+# --- new-workflow switch (runs before A–E) ----------------------------------------
+
+
+def detect_new_workflow(text: str, state: ConversationState):
+    """Return the RouteResult when `text` is a strong new-workflow intent that should switch away
+    from the active conversation, else None. Deterministic — this reads the existing router.
+
+    Only a Single Vehicle Valuation (`PRICE_INVENTORY`) switches: event/promotion phrases route to
+    MERCHANDISE and must stay aging reruns, and same-workflow (IMPROVE_AGING) routes are follow-ups.
+    An explicit aging-intent word keeps the message a follow-up regardless."""
+    if _AGING_INTENT.search(text):
+        return None
+    routed = route(text)
+    if routed.selected_workflow is WorkflowContext.PRICE_INVENTORY:
+        return routed
+    return None
+
+
+def _switch_workflow(text, state, routed, as_of: datetime) -> FollowupResult:
+    """Resolve the target vehicle and run the existing deterministic valuation. On success returns
+    a SWITCH result (the caller performs the state switch); on failure or ambiguity it returns an
+    error/clarification and the active aging result is left untouched."""
+    target, ambiguous = _price_target(text, state)
+    if ambiguous:
+        options = _describe_ids(state, ambiguous)
+        return FollowupResult(
+            SOURCE_CLARIFICATION,
+            f"More than one vehicle matches that — {options}. Which should I value?",
+            referenced_ids=tuple(ambiguous))
+    if target is None and not routed.execution_allowed:
+        return FollowupResult(
+            SOURCE_CLARIFICATION,
+            "Which vehicle should I value? Name it (year, make, model) or pick one from the "
+            "current list.")
+
+    query = f"price {target}" if target else text
+    try:
+        response = run_assistant(query, as_of=as_of)
+    except Exception as error:  # noqa: BLE001 — a failed switch must never overwrite the prior result
+        return FollowupResult(
+            SOURCE_ERROR,
+            f"I couldn't complete the valuation ({type(error).__name__}); I've kept the previous "
+            "analysis.", success=False)
+
+    if response.state is AssistantState.ROUTED_AND_EXECUTED \
+            and response.workflow is WorkflowContext.PRICE_INVENTORY:
+        desc = response.summary.get("vehicle") or response.resolved_vehicle_id
+        prior = _workflow_label(state.active_workflow_type)
+        transition = f"Switching from {prior} to Single Vehicle Valuation for {desc}."
+        ids = (response.resolved_vehicle_id,) if response.resolved_vehicle_id else ()
+        return FollowupResult(SOURCE_SWITCH, transition, referenced_ids=ids,
+                              success=True, response=response)
+
+    if response.state is AssistantState.AMBIGUOUS_MATCH:
+        return FollowupResult(
+            SOURCE_CLARIFICATION,
+            "More than one vehicle matches that description. Which one did you mean?")
+    if response.state is AssistantState.EXECUTION_ERROR:
+        return FollowupResult(
+            SOURCE_ERROR,
+            "The valuation could not be completed, so I've kept the previous analysis.",
+            success=False)
+    # NO_MATCH / NEEDS_CLARIFICATION — ask, do not switch, keep the prior result.
+    return FollowupResult(SOURCE_CLARIFICATION,
+                          response.message or "Which vehicle should I value?")
+
+
+def _price_target(text: str, state: ConversationState):
+    """(vehicle_id, None) for a single resolved target; (None, ids) when ambiguous; (None, None)
+    when nothing resolves. Uses the active-result reference resolver (Slice 2), including the
+    documented analysed-over-excluded preference."""
+    ref = resolve_reference(text, state)
+    if ref.ambiguous:
+        return None, ref.ids
+    if len(ref.ids) == 1:
+        return ref.ids[0], None
+    if len(ref.ids) > 1:
+        return None, ref.ids
+    if _THIS_VEHICLE.search(text) and len(state.last_referenced_vehicle_ids) == 1:
+        return state.last_referenced_vehicle_ids[0], None
+    return None, None
+
+
+def _describe_ids(state: ConversationState, ids) -> str:
+    index = vehicle_index(state.active_result) if state.active_workflow_type == \
+        "IMPROVE_AGING_INVENTORY" else {}
+    return "; ".join(f"{index[i].description} ({i})" if i in index else i for i in ids)
+
+
+def _non_aging_followup(state: ConversationState) -> FollowupResult:
+    """After switching to a single-skill result (e.g. a valuation), keep the conversation honest:
+    offer to value another vehicle or return to the earlier analysis, rather than pretend a rich
+    follow-up engine exists for it."""
+    prior = state.prior_workflows[-1].workflow_type if state.prior_workflows else None
+    hint = " or ask to go back to the aging analysis" if prior == "IMPROVE_AGING_INVENTORY" else ""
+    return FollowupResult(
+        SOURCE_CLARIFICATION,
+        f"You're viewing the {_workflow_label(state.active_workflow_type)} result. Ask me to value "
+        f"another vehicle{hint}. The full evidence is in the workspace.")
+
+
+def _workflow_label(workflow_type: str | None) -> str:
+    return {
+        "IMPROVE_AGING_INVENTORY": "Improve Aging Inventory",
+        "PRICE_INVENTORY": "Single Vehicle Valuation",
+        "ACQUIRE_INVENTORY": "Portfolio Forecast",
+        "MERCHANDISE_INVENTORY": "Event Promotion",
+    }.get(workflow_type or "", workflow_type or "the previous workflow")
 
 
 # --- E. unsupported / unavailable -------------------------------------------------
@@ -301,9 +451,11 @@ def _clarification(text: str, state: ConversationState, as_of: datetime) -> Foll
 
 
 def _filter(text: str, state: ConversationState, as_of: datetime) -> FollowupResult | None:
-    # An explicit "why … <vehicle>" is an explanation, not a filter — defer to _explain.
+    # A question about one specific vehicle ("is the Accord below break-even?") is an explanation
+    # of that vehicle, not a group filter — defer to _explain. A group reference (the wholesale
+    # vehicles, the two no-immediate) or a pure filter phrase still filters.
     ref = resolve_reference(text, state)
-    if _WHY.search(text) and (ref.ids or ref.ambiguous):
+    if ref.ambiguous or (len(ref.ids) == 1) or (_WHY.search(text) and ref.ids):
         return None
     match = next((f for f in _FILTERS if f[0].search(text)), None)
     if match is None:

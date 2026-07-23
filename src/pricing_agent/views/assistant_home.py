@@ -34,6 +34,7 @@ from pricing_agent.agents.conversation import (
     SOURCE_FILTERED,
     SOURCE_FIRST_TURN,
     SOURCE_RERUN,
+    SOURCE_SWITCH,
     SOURCE_UNSUPPORTED,
 )
 from pricing_agent.views import terminology as T
@@ -61,6 +62,7 @@ _PROVENANCE = {
     SOURCE_UNSUPPORTED: "🚫 Not available in this prototype",
     SOURCE_ERROR: "⚠️ Kept your previous analysis",
     SOURCE_RERUN: "🔄 Re-ran the analysis",
+    SOURCE_SWITCH: "🔀 Switched workflow",
 }
 
 # Read by the Price Inventory view to preselect the routed vehicle.
@@ -168,11 +170,11 @@ def render_assistant_home(
     conversation = st.session_state.get(CONVERSATION_KEY)
     response: AssistantResponse | None = st.session_state.get(RESPONSE_KEY)
 
-    if conversation is not None and conversation.active_workflow_type == "IMPROVE_AGING_INVENTORY":
+    if conversation is not None and conversation.has_active_result:
         st.divider()
         _render_conversation(conversation)
         _render_followup_suggestions(conversation)
-        follow = st.chat_input("Ask a follow-up about this analysis…")
+        follow = st.chat_input("Ask a follow-up, or start a new request…")
         if follow and follow.strip():
             handle_followup(follow, conversation, as_of=AS_OF)
             _sync_workspace(conversation)
@@ -217,21 +219,30 @@ def _start_conversation(request: str) -> None:
 
 
 def _sync_workspace(conversation) -> None:
-    """Keep the workspace pointed at the conversation's active result, so opening the Improve
-    Aging page (and returning) preserves the current event, target, and referenced vehicles."""
-    if conversation.active_result is not None:
+    """Keep the workspace(s) pointed at the conversation's active result, so opening a workflow
+    page (and returning) preserves context. The aging result seeds the Improve Aging workspace;
+    a valuation switch seeds the Price Inventory preselect."""
+    if conversation.active_workflow_type == "IMPROVE_AGING_INVENTORY" \
+            and conversation.active_result is not None:
         st.session_state["improve_aging_result"] = conversation.active_result
+    elif conversation.active_workflow_type == "PRICE_INVENTORY" and conversation.active_vehicle_ids:
+        st.session_state[SELECTED_VEHICLE_KEY] = conversation.active_vehicle_ids[0]
 
 
 def _render_conversation(conversation) -> None:
     """The full turn-by-turn thread. Prior turns are never erased; the first turn renders the
-    Slice-1 rich answer, later turns render their grounded text with a provenance chip."""
+    Slice-1 rich answer, a workflow switch renders the new workflow's result, and other turns
+    render their grounded text with a provenance chip."""
     for message in conversation.messages:
         with st.chat_message(message.role):
             if message.role == "user":
                 st.markdown(md(message.text))
             elif message.source == SOURCE_FIRST_TURN and message.response is not None:
                 _render_improve_aging_result(message.response, show_followups=False)
+            elif message.source == SOURCE_SWITCH and message.response is not None:
+                st.caption(_PROVENANCE[SOURCE_SWITCH])
+                st.markdown(md(message.text))
+                _render_switch_result(message.response)
             else:
                 caption = _PROVENANCE.get(message.source)
                 if caption:
@@ -241,6 +252,18 @@ def _render_conversation(conversation) -> None:
                         and message.response.target_url:
                     _open_workflow_link(message.response.target_url,
                                         "Open the updated workspace →")
+
+
+def _render_switch_result(response: AssistantResponse) -> None:
+    """Render the switched-to workflow's normal result inside the thread (a valuation for now)."""
+    if response.workflow is WorkflowContext.PRICE_INVENTORY:
+        _render_pricing_result(response)
+    elif response.workflow is WorkflowContext.ACQUIRE_INVENTORY:
+        _render_portfolio_result(response)
+    elif response.workflow is WorkflowContext.MERCHANDISE_INVENTORY:
+        _render_promotion_result(response)
+    elif response.workflow is WorkflowContext.IMPROVE_AGING_INVENTORY:
+        _render_improve_aging_result(response, show_followups=False)
 
 
 def _render_followup_suggestions(conversation) -> None:
