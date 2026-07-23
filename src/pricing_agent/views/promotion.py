@@ -18,6 +18,7 @@ import streamlit as st
 
 from pricing_agent.mcp_clients import EventClient, MockTransport, VautoClient
 from pricing_agent.skills.promotion_planner import plan_event
+from pricing_agent.views.workflow_copy import render_workflow_header
 from pricing_agent.workflows.context import WorkflowContext
 
 import ui_components
@@ -66,13 +67,13 @@ FEASIBILITY_STYLE = {
 def render_promotion_planner(workflow_context: WorkflowContext | None = None) -> None:
     """Render the event promotion planner.
 
-    `workflow_context` is accepted and ignored. Phase 2 is a pure refactor; the parameter
-    exists so Phase 3 can bind it through `st.Page` without touching this signature again.
+    `workflow_context` selects the page copy and nothing else — the plan, the feasibility
+    verdict and every figure below are computed identically without it.
     """
     catalog = events(AS_OF)
     labels = {f"{e['event_name']} ({e['start_date']} → {e['end_date']})": e["event_id"] for e in catalog}
 
-    st.title("Event promotion planner")
+    copy = render_workflow_header(workflow_context, fallback_title="Event promotion planner")
 
     choice = st.sidebar.selectbox("Event", list(labels))
     event_id = labels[choice]
@@ -95,6 +96,9 @@ def render_promotion_planner(workflow_context: WorkflowContext | None = None) ->
         f"{objective['event']['end_date']} · dates resolved from "
         f"`{objective['event']['date_source']}`"
     )
+
+    if copy is not None and copy.instruction is not None:
+        st.caption(copy.instruction)
 
     # --- feasibility first ----------------------------------------------------------------
 

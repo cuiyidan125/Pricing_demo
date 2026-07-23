@@ -245,31 +245,34 @@ def test_the_registry_holds_no_calculation():
 # --- the assistant shell does not overreach -------------------------------------------
 
 
-def test_assistant_shell_calls_no_model_and_no_write_tool():
-    """This phase captures a question. It must not route it, price it, or publish it."""
+def test_assistant_page_calls_no_model_and_publishes_nothing():
+    """Phase 4 routes and executes — deterministically. It may reach the agent layer, but
+    never a model and never the write path."""
     source = (VIEWS / "assistant_home.py").read_text(encoding="utf-8")
     for banned in (
         "pricing_agent.llm",
-        "pricing_agent.agents",
         "anthropic",
+        "openai",
         "publish_vehicle_price",
         "save_pricing_decision",
-        "pricing_agent.skills",
     ):
-        assert banned not in source, f"assistant shell must not reference {banned}"
+        assert banned not in source, f"assistant page must not reference {banned}"
 
 
-def test_assistant_preserves_the_question_and_says_routing_is_not_connected():
+def test_assistant_routes_through_the_deterministic_agent():
     source = (VIEWS / "assistant_home.py").read_text(encoding="utf-8")
+    assert "run_assistant" in source, "the page must call the deterministic orchestrator"
     assert SESSION_KEY in source
     assert "st.session_state" in source
-    assert "will be connected in the next phase" in source
+    # The Phase 3 shell disclaimer is gone: routing is connected now.
+    assert "will be connected in the next phase" not in source
 
 
-def test_assistant_offers_the_four_suggested_prompts():
+def test_assistant_offers_four_suggested_prompts_that_route():
     assert len(SUGGESTED_PROMPTS) == 4
     joined = " ".join(SUGGESTED_PROMPTS).lower()
-    for fragment in ("price this vehicle", "next 30 days", "aging vehicles", "70 percent"):
+    # One prompt per supported destination, plus the deferred aging case.
+    for fragment in ("f-150", "next 30 days", "summer clearance", "aging vehicles"):
         assert fragment in joined
 
 

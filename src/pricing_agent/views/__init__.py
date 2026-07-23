@@ -20,17 +20,27 @@ from pricing_agent.views.page_config import (
 )
 from pricing_agent.views.promotion import render_promotion_planner
 from pricing_agent.views.vehicle_detail import render_vehicle_detail
+from pricing_agent.views.workflow_copy import (
+    WORKFLOW_COPY,
+    WorkflowCopy,
+    copy_for,
+    render_workflow_header,
+)
 
 __all__ = [
     "APP_TITLE",
     "PROMOTION_ICON",
     "PROMOTION_TITLE",
     "VEHICLE_DETAIL_TITLE",
+    "WORKFLOW_COPY",
     "WorkflowCard",
+    "WorkflowCopy",
     "configure_page",
+    "copy_for",
     "render_assistant_home",
     "render_dashboard",
     "render_improve_aging",
     "render_promotion_planner",
     "render_vehicle_detail",
+    "render_workflow_header",
 ]

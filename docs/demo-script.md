@@ -14,15 +14,28 @@ workflows, and a workflow can use more than one.
 
 ---
 
-## Beat 0 — Open on the assistant (20s)
+## Beat 0 — Ask the assistant (45s)
 
-The app lands on **Ask the Dealer AI Assistant**.
+The app lands on **Ask the Dealer AI Assistant**. Type — or click the suggested prompt —
+**"What should I price 2020 Ford F-150 XLT?"** and hit **Analyze**.
 
-> "This is where a manager starts — a question in their own words, not a form."
+> "A question in the manager's own words. It figured out this is a pricing job, matched the
+> truck to the one in inventory, and ran the valuation — recommended price, days to sell,
+> break-even, all of it."
 
-Say plainly what it does today: it captures the question and tells you routing is not
-connected yet. **Do not mime a conversation.** The honesty is the point, and the sidebar
-below it is what the rest of the demo runs on.
+Then the honest part, which is the point:
+
+> "No AI wrote those numbers. The routing is deterministic — rules, not a model — and every
+> figure comes straight from the pricing engine. The assistant chooses *which* analysis to
+> run; it never does the arithmetic."
+
+Open the **How this was routed** expander to show the detected workflow, the confidence,
+and the reason codes. Then click **Open the full Price Inventory analysis** — the workspace
+opens on that exact truck.
+
+If asked what it can't do yet: name a vehicle that isn't on the lot ("a Tesla Model 3") and
+it says so plainly rather than inventing one; ask about aging inventory and it routes but
+tells you the orchestration isn't built. **Don't mime a conversation it can't have.**
 
 ---
 
@@ -156,9 +169,12 @@ architecture is built this way: it coordinates all three skills against aged uni
 than being a fourth skill. Today it shows the six-step sequence and which capability
 serves each step. Say that plainly — the page will contradict you otherwise.
 
-**"Can I just ask it a question?"**
-Not yet. The assistant captures the question and tells you routing is not connected. The
-workflows in the sidebar are what runs today.
+**"Is the assistant using ChatGPT / an LLM?"**
+No. Phase 4 routing is deterministic — keyword rules for intent, pattern matching for the
+vehicle, a lookup against inventory. It runs one skill and copies the skill's numbers.
+There is a test that makes any model call throw and proves the pricing path still works.
+An LLM-based router is a later phase, and it will only ever choose the workflow, never
+produce a figure.
 
 **"Could the AI just make up a price?"**
 Two independent guards, both tested. The calculation layer can't import a model, and any

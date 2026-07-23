@@ -91,8 +91,9 @@ Streamlit import and no arithmetic; it binds a `WorkflowContext` into each view 
 `functools.partial`, which is what lets one view serve more than one workflow without being
 copied.
 
-Two capabilities the shell does not yet have, stated on screen rather than implied:
-natural-language routing from the assistant, and Improve Aging orchestration.
+One capability the shell does not yet have, stated on screen rather than implied: Improve
+Aging orchestration. Natural-language routing **is** connected as of Phase 4 — but
+deterministically, with no model (§3.5).
 
 ---
 
@@ -133,6 +134,29 @@ A post-generation check extracts every currency figure and duration from the nar
 asserts each appears in `explanation_inputs`. A figure that does not match fails the response
 rather than reaching the user. This closes the gap D1 leaves open, where a model might quote
 the optimistic tail of a loss-bearing quantity.
+
+### 3.5 Deterministic routing (Phase 4)
+
+The assistant entry point routes natural language to a workflow and executes one skill
+**without any model**. `src/pricing_agent/agents/` holds three deterministic modules:
+
+* `router.py` — classifies intent by keyword precedence (aging cohort → promotion →
+  forecast → pricing) and parses the vehicle a pricing request names, with per-field
+  confidence. It produces **no number**: a `year` or `mileage` in its output was typed by
+  the user and copied through, and `test_router.py` asserts the extracted entities appear
+  verbatim in the input.
+* `resolver.py` — matches the parsed vehicle against real inventory by documented priority
+  (id → VIN → year+make+model+trim → year+make+model → make+model, each requiring a unique
+  match). Ambiguous returns candidates; unmatched returns NONE — it never fabricates a
+  vehicle.
+* `assistant.py` — the orchestrator. Runs at most one skill, copies every summary figure
+  from the schema-valid skill result, and returns one of six states.
+
+This is a second, independent enforcement of §4.1 at the routing layer: the LLM
+containment guarantee does not depend on the LLM being absent, but the deterministic router
+happens not to use one at all. `test_assistant.py` makes a model call explode and asserts
+the pricing path still executes. When an LLM-based router is added later, it will sit
+*above* this layer — choosing a workflow, never producing a figure.
 
 ---
 
@@ -296,10 +320,12 @@ other fixtures permanently fresh.
 
 ```text
 src/
-├── workflows/         registry (the four dealer workflows + the assistant), WorkflowContext
+├── workflows/         registry (the four dealer workflows + the assistant), WorkflowContext,
+│                      pages (url_path → live st.Page, for client-side links)
 ├── views/             dashboard, vehicle_detail, promotion, assistant_home,
-│                      improve_aging, page_config — render only
-├── agents/            intent routing, extraction, clarification, narration guard
+│                      improve_aging, workflow_copy, page_config — render only
+├── agents/            deterministic router + resolver + assistant orchestrator (Phase 4),
+│                      extraction, clarification, narration guard
 ├── skills/            one module per skill; orchestration only
 ├── mcp_clients/       vauto_client, cost_client, capacity_client, event_client
 │                      (read-only) + write_client (isolated, §8)
