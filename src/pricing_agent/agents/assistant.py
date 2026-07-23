@@ -455,6 +455,15 @@ def _improve_aging_summary(result) -> dict:
     action_counts: dict[str, int] = {}
     for a in result.consolidated_actions:
         action_counts[a["recommended_action"]] = action_counts.get(a["recommended_action"], 0) + 1
+    # Reconciled counts: distinguish analysed vehicles, those needing immediate action, and the
+    # number of vehicles (not approval records) needing a manager review. A grouping of what the
+    # workflow already decided — no reclassification, no recomputed number.
+    _immediate = {"REPRICE_NOW", "EVENT_PROMOTION", "MANAGER_REVIEW",
+                  "WHOLESALE_OR_LOSS_MINIMIZATION_REVIEW"}
+    analysed_ids = {e.vehicle_id for e in result.vehicle_evidence}
+    action_by_id = {a["vehicle_id"]: a["recommended_action"] for a in result.consolidated_actions}
+    immediate_count = sum(1 for vid in analysed_ids if action_by_id.get(vid) in _immediate)
+    review_vehicle_ids = {a.get("vehicle_id") for a in result.approvals_required if a.get("vehicle_id")}
     return {
         "workflow": "Improve Aging Inventory",
         "current_inventory": diag.get("current_inventory"),
@@ -464,6 +473,10 @@ def _improve_aging_summary(result) -> dict:
         "units_below_break_even": diag.get("units_below_break_even"),
         "candidate_count": len(selection.candidates) if selection else 0,
         "deep_analysed_count": len(result.vehicle_evidence),
+        "immediate_action_count": immediate_count,
+        "no_immediate_action_count": len(analysed_ids) - immediate_count,
+        "review_vehicle_count": len(review_vehicle_ids),
+        "review_item_count": len(result.approvals_required),
         "excluded_count": len(selection.exclusions) if selection else 0,
         "required_unit_reduction": diag.get("required_unit_reduction"),
         "recommended_plan": promotion["recommended_plan"]["plan_type"] if promotion else None,

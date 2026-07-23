@@ -215,8 +215,11 @@ def _render_improve_aging_result(response: AssistantResponse) -> None:
     )
     c2.metric("Target likelihood",
               "No event" if target == "NO_EVENT" else T.feasibility_label(target))
-    c3.metric("Vehicles requiring action", s.get("candidate_count", 0),
-              f"{s.get('deep_analysed_count', 0)} analysed", delta_color="off")
+    analysed = s.get("deep_analysed_count", s.get("candidate_count", 0))
+    immediate = s.get("immediate_action_count")
+    c3.metric("Aging vehicles analysed", analysed,
+              (f"{immediate} need action now" if isinstance(immediate, int) else None),
+              delta_color="off")
 
     bits = []
     if s.get("recommended_plan"):
@@ -224,8 +227,13 @@ def _render_improve_aging_result(response: AssistantResponse) -> None:
     prob = s.get("probability_target_achieved")
     if isinstance(prob, (int, float)):
         bits.append(f"reaches the target **{prob:.0%}** of the time")
-    if s.get("approvals_required"):
-        bits.append(f"**{s['approvals_required']}** manager review(s) required")
+    review_vehicles = s.get("review_vehicle_count")
+    review_items = s.get("review_item_count", s.get("approvals_required"))
+    if review_vehicles:
+        bits.append(f"**{review_vehicles}** vehicle(s) need a manager review "
+                    f"({review_items} review item(s))")
+    elif s.get("approvals_required"):
+        bits.append(f"**{s['approvals_required']}** manager review item(s) required")
     if bits:
         st.caption(" · ".join(bits))
 

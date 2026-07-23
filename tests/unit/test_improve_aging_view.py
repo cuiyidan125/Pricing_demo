@@ -253,6 +253,67 @@ def test_no_price_publishing_introduced(name):
 # --- disclosure copy ------------------------------------------------------------------
 
 
+# --- count reconciliation (7 analysed vs 5 shown; 17 records vs 5 vehicles) -----------
+
+
+def test_reconciled_counts_no_event_shows_all_analysed(no_event):
+    """Without an event, 7 vehicles are analysed but two (V-10008, V-10001) carry no immediate
+    action. The reconciliation surfaces all 7 and names the two, instead of silently hiding them."""
+    rc = view.reconciled_counts(no_event)
+    assert rc["analysed"] == 7
+    assert rc["immediate_action"] == 5
+    assert rc["no_immediate_action"] == 2
+    assert set(rc["no_immediate_ids"]) == {"V-10008", "V-10001"}
+    # Invariant the workspace relies on: the two buckets partition the analysed set.
+    assert rc["immediate_action"] + rc["no_immediate_action"] == rc["analysed"]
+    assert set(rc["immediate_ids"]).isdisjoint(rc["no_immediate_ids"])
+
+
+def test_reconciled_review_counts_distinguish_vehicles_from_records(no_event):
+    """The '17' is a count of approval records across 5 vehicles — the reconciliation reports both
+    so the metric stops implying 17 separate manager reviews."""
+    rc = view.reconciled_counts(no_event)
+    assert rc["review_items"] == len(no_event.approvals_required) == 17
+    assert rc["review_vehicles"] == 5
+    assert rc["review_vehicles"] == len(rc["review_vehicle_ids"])
+    # Every review vehicle is one the workflow already flagged with a non-empty approvals list.
+    flagged = {a["vehicle_id"] for a in no_event.consolidated_actions if a["approvals_required"]}
+    assert set(rc["review_vehicle_ids"]) == flagged
+
+
+def test_reconciled_counts_with_event_needs_no_omission(result):
+    """With the Summer Clearance event the two hold-gross vehicles become promotion candidates,
+    so all analysed vehicles need action and nothing is omitted — the counts stay reconciled."""
+    rc = view.reconciled_counts(result)
+    assert rc["analysed"] == 7
+    assert rc["no_immediate_action"] == 0
+    assert rc["immediate_action"] == 7
+    assert rc["review_items"] == len(result.approvals_required)
+
+
+def test_reconciliation_changes_no_classification(no_event):
+    """The reconciliation must not move any vehicle between action buckets — the per-vehicle
+    recommended_action the workflow produced is unchanged."""
+    actions = {a["vehicle_id"]: a["recommended_action"] for a in no_event.consolidated_actions}
+    assert actions["V-10008"] == "NO_ACTION"
+    assert actions["V-10001"] == "NO_ACTION"
+    # The five immediate-action vehicles keep their action labels.
+    assert actions["V-10005"] == "WHOLESALE_OR_LOSS_MINIMIZATION_REVIEW"
+    assert actions["V-10002"] == "MANAGER_REVIEW"
+
+
+def test_assistant_summary_carries_reconciled_counts():
+    response = run_assistant("Which aging vehicles should I promote?", as_of=AS_OF)
+    s = response.summary
+    assert s["deep_analysed_count"] == 7
+    assert s["immediate_action_count"] == 5
+    assert s["no_immediate_action_count"] == 2
+    assert s["review_vehicle_count"] == 5
+    assert s["review_item_count"] == 17
+    # The raw approval-record count is still available and unchanged.
+    assert s["approvals_required"] == 17
+
+
 def test_disclosure_states_the_four_safeguards():
     source = (VIEWS / "improve_aging.py").read_text(encoding="utf-8")
     lowered = source.lower()
