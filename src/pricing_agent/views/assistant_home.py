@@ -104,7 +104,7 @@ def render_assistant_home(
         "- Price a vehicle already in inventory, end to end\n"
         "- Forecast what the lot will sell over the next 30 and 90 days\n"
         "- Plan a sale event when you name one on the calendar\n"
-        "- Route an aging-inventory question (orchestration arrives in a later phase)"
+        "- Improve aging inventory — diagnose, select, price, and plan across all three skills"
     )
 
     request = st.text_area(
@@ -197,39 +197,39 @@ def _render_executed(response: AssistantResponse) -> None:
 
 
 def _render_improve_aging_result(response: AssistantResponse) -> None:
+    """A concise chat summary — enough to grasp the answer without scrolling. The full
+    dashboard lives on the workspace page, linked below."""
     s = response.summary
     icon = "✅" if response.state is AssistantState.ROUTED_AND_EXECUTED else "🚫"
     st.markdown(f"{icon} **Improve Aging Inventory** — {md(response.message)}")
 
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Units on lot", s.get("current_inventory", "—"),
-              f"{s.get('current_utilization', 0):.0%} utilized", delta_color="off")
-    c2.metric("Aging candidates", s.get("candidate_count", 0),
-              f"{s.get('deep_analysed_count', 0)} analysed", delta_color="off")
-    c3.metric("Excluded / protected", s.get("excluded_count", 0))
     target = s.get("target_status", "NO_EVENT")
-    c4.metric("Target", "No event" if target == "NO_EVENT" else target.replace("_", " ").title())
+    util, tgt = s.get("current_utilization"), s.get("target_utilization")
+    c1, c2, c3 = st.columns(3)
+    c1.metric(
+        "Utilization → target",
+        f"{util:.0%}" if isinstance(util, (int, float)) else "—",
+        (f"target {tgt:.0%}" if isinstance(tgt, (int, float)) else "no target"),
+        delta_color="off",
+    )
+    c2.metric("Target status", "No event" if target == "NO_EVENT" else target.replace("_", " ").title())
+    c3.metric("Action candidates", s.get("candidate_count", 0),
+              f"{s.get('deep_analysed_count', 0)} analysed", delta_color="off")
 
-    reduction = s.get("required_unit_reduction")
-    prob = s.get("probability_target_achieved")
     bits = []
-    if reduction is not None:
-        bits.append(f"needs **{reduction}** incremental sale(s)")
     if s.get("recommended_plan"):
         bits.append(f"recommended plan **{s['recommended_plan'].replace('_', ' ').title()}**")
-    if prob is not None:
+    prob = s.get("probability_target_achieved")
+    if isinstance(prob, (int, float)):
         bits.append(f"hits target **{prob:.0%}** of the time")
+    if s.get("approvals_required"):
+        bits.append(f"**{s['approvals_required']}** approval(s) required")
     if bits:
         st.caption(" · ".join(bits))
 
-    counts = s.get("action_counts") or {}
-    if counts:
-        st.caption("Actions: " + " · ".join(
-            f"{k.replace('_', ' ').title()} {v}" for k, v in counts.items()))
-    if s.get("approvals_required"):
-        st.caption(f"⚠️ {s['approvals_required']} approval(s) required before anything moves.")
-
-    _render_warnings(response)
+    # Top one or two warnings only — the workspace shows the full set.
+    for warning in response.warnings[:2]:
+        st.caption(f"⚠️ `{warning.get('code')}` — {md(str(warning.get('message', '')))[:110]}")
 
     if response.target_url:
         _open_workflow_link(response.target_url, "Open the full Improve Aging workspace →")

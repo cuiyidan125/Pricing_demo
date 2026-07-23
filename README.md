@@ -50,7 +50,7 @@ use.
 ### Tests
 
 ```bash
-python -m pytest tests -q            # 387 tests
+python -m pytest tests -q            # 410 tests
 python scripts/validate_schemas.py   # 62 checks: schemas, refs, fixtures, scenarios
 ```
 
@@ -109,6 +109,12 @@ candidate selection → single-vehicle valuation for the aged cohort → promoti
 real event is named → one consolidated action plan. It adds no arithmetic of its own, and it
 keeps each skill's simulation separate: percentiles from different simulations are shown side
 by side, never summed. See `docs/improve-aging-orchestration-results.md`.
+
+Its workspace is written for a dealer, not an engineer: it opens with an executive summary
+(utilization vs target, units to release, target achievability) and a plain "what should I do
+next?", then the recommended plan, the vehicles to act on with dealer-friendly reasons, and
+only then the evidence tables and the full execution trace. See
+`docs/improve-aging-demo-polish-results.md`.
 
 **Still not built, and the UI says so:** LLM-based routing (the deterministic router stands
 in for it).
