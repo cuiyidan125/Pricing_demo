@@ -21,12 +21,14 @@ from pricing_agent.llm import credentials_present, explain
 from pricing_agent.mcp_clients import MockTransport, VautoClient
 from pricing_agent.policy.price_floor import can_publish
 from pricing_agent.skills.single_vehicle import analyze
+from pricing_agent.views import terminology as T
+from pricing_agent.views.glossary import render_glossary
 from pricing_agent.views.workflow_copy import render_workflow_header
 from pricing_agent.workflows.context import WorkflowContext
 
 import ui_components
 
-AS_OF = datetime(2026, 7, 21, 14, 0, tzinfo=timezone.utc)
+AS_OF = datetime(2026, 7, 29, 14, 0, tzinfo=timezone.utc)
 
 SEVERITY_STYLE = {
     "BLOCKING": ("🚫", "error"),
@@ -210,28 +212,31 @@ def render_vehicle_detail(workflow_context: WorkflowContext | None = None) -> No
     recommended = scenario["proposed_list_price"]
 
     c1.metric(
-        "Recommended price",
+        T.metric("recommended_price"),
         f"${recommended:,.0f}",
         f"${recommended - current:+,.0f} vs current" if current else None,
     )
-    c2.metric("Market value", f"${valuation['market_value']:,.0f}", valuation["anchor"].title())
+    c2.metric(T.metric("market_value"), f"${valuation['market_value']:,.0f}", valuation["anchor"].title())
     c3.metric(
-        "P50 gross",
+        T.metric("expected_gross_p50"),
         f"${scenario['expected_front_end_gross']['p50']:,.0f}",
-        f"P10 ${scenario['expected_front_end_gross']['p10']:,.0f}",
+        f"Downside (P10) ${scenario['expected_front_end_gross']['p10']:,.0f}",
         delta_color="off",
     )
     c4.metric(
-        "Days to sell",
+        T.metric("expected_days_p50"),
         f"{scenario['additional_days_to_sale']['p50']:.0f}",
-        f"P90 {scenario['additional_days_to_sale']['p90']:.0f} days",
+        f"Conservative (P90) {scenario['additional_days_to_sale']['p90']:.0f} days",
         delta_color="off",
     )
 
     st.caption(
-        f"Strategy **{recommended_strategy.replace('_', ' ').title()}** · "
-        + " · ".join(f"`{c}`" for c in result["recommended_strategy"]["rationale_codes"])
+        f"Recommended pricing approach: **{T.strategy_name(recommended_strategy)}** — "
+        f"{T.STRATEGY.get(recommended_strategy, {}).get('trade_off', '')}"
     )
+    with st.expander("View technical reason codes"):
+        st.caption("Rationale codes: "
+                   + " · ".join(f"`{c}`" for c in result["recommended_strategy"]["rationale_codes"]))
 
     # --- narration, constrained to the allow-list -------------------------------------
 
@@ -257,7 +262,8 @@ def render_vehicle_detail(workflow_context: WorkflowContext | None = None) -> No
 
     # --- aging timeline ---------------------------------------------------------------
 
-    st.subheader("Where this car is in its life on the lot")
+    st.subheader("Time on lot")
+    st.caption("See whether the vehicle is likely to cross key aging thresholds before it sells.")
     st.plotly_chart(
         ui_components.aging_timeline(
             days_in_inventory=vehicle["days_in_inventory"],
@@ -268,35 +274,38 @@ def render_vehicle_detail(workflow_context: WorkflowContext | None = None) -> No
     projected = sales["projected_total_inventory_age"]
     st.caption(
         md(
-            f"Median total age at sale **{projected['p50']:.0f} days**, "
-            f"**{projected['p90']:.0f} days** in the adverse case. "
-            f"P(over 90 days) is {sales['projected_age_exceedance']['over_90_days']:.0%}. "
-            "The whisker is the point — a car whose median clears 90 days comfortably can "
-            "still carry a tail well past it, and the tail is the real exposure."
+            f"Expected total days on lot at sale **{projected['p50']:.0f} days (P50)**, "
+            f"**{projected['p90']:.0f} days** in a conservative case (P90). "
+            f"Risk of exceeding 90 days on lot: {sales['projected_age_exceedance']['over_90_days']:.0%}. "
+            "A vehicle whose expected time clears 90 days can still carry a longer tail — that "
+            "tail is the real exposure."
         )
     )
 
     # --- warnings ---------------------------------------------------------------------
 
     if result["warnings"]:
-        st.subheader("Warnings")
+        st.subheader("What to review before changing the price")
         for warning in result["warnings"]:
             icon, kind = SEVERITY_STYLE.get(warning["severity"], ("•", "info"))
             margin = ""
             if warning["observed"] is not None and warning["threshold"] is not None:
                 margin = (
-                    f"  \nObserved **{warning['observed']:,.2f}** against a threshold of "
+                    f"  \nObserved **{warning['observed']:,.2f}** against a limit of "
                     f"**{warning['threshold']:,.2f}** ({warning['unit'].lower()})."
                 )
-            body = f"{icon} **{warning['severity']} · {warning['code']}**  \n{warning['message']}{margin}"
+            body = f"{icon} **{T.warning_label(warning['code'])}**  \n{warning['message']}{margin}"
             if warning["remediation"]:
                 body += f"  \n_{warning['remediation']}_"
             getattr(st, kind)(md(body))
+        with st.expander("View technical reason codes"):
+            st.caption("Warning codes: " + ", ".join(f"`{w['code']}`" for w in result["warnings"]))
 
     if result["approvals_required"]:
+        kinds = [a["approval_type"] for a in result["approvals_required"]]
         st.warning(
-            "**Manager approval required:** "
-            + ", ".join(a["approval_type"].replace("_", " ").title() for a in result["approvals_required"]),
+            "**Manager review required.** "
+            + " ".join(dict.fromkeys(T.approval_why(k) for k in kinds)),
             icon="✋",
         )
 
@@ -307,10 +316,10 @@ def render_vehicle_detail(workflow_context: WorkflowContext | None = None) -> No
     left, right = st.columns([3, 2])
 
     with left:
-        st.subheader("Gross against turn")
+        st.subheader("Profit and sales-speed trade-off")
         st.caption(
-            "Three strategies from one simulation sharing a seed, so the differences are the "
-            "price change and not sampling noise."
+            "Compare how each pricing approach affects expected sales speed, front-end gross, "
+            "and total economic value. The whiskers show the range from downside to conservative."
         )
 
         figure = go.Figure()
@@ -321,7 +330,7 @@ def render_vehicle_detail(workflow_context: WorkflowContext | None = None) -> No
                     x=[item["additional_days_to_sale"]["p50"]],
                     y=[item["expected_front_end_gross"]["p50"]],
                     mode="markers+text",
-                    text=[item["strategy"].replace("_", " ").title()],
+                    text=[T.strategy_name(item["strategy"])],
                     textposition="top center",
                     marker=dict(size=22 if is_recommended else 14,
                                 symbol="star" if is_recommended else "circle"),
@@ -337,26 +346,25 @@ def render_vehicle_detail(workflow_context: WorkflowContext | None = None) -> No
             )
         figure.add_hline(y=0, line_dash="dot", line_color="grey")
         figure.update_layout(
-            xaxis_title="P50 days to sale (bars show P10–P90)",
-            yaxis_title="P50 front-end gross ($)",
+            xaxis_title="Expected days to sale (P50) — range shows downside to conservative",
+            yaxis_title="Expected front-end gross (P50), $",
             height=380,
             margin=dict(t=20, b=10),
         )
         st.plotly_chart(figure)
 
+        # Decision-ordered columns; every value read from the result (no calculation here).
         table = pd.DataFrame(
             [
                 {
-                    "Strategy": s["strategy"].replace("_", " ").title(),
-                    "List price": s["proposed_list_price"],
-                    "Price to market": s["price_to_market_ratio"],
-                    "Deal rating": s["deal_rating"],
-                    "P50 days": s["additional_days_to_sale"]["p50"],
+                    "Pricing approach": T.strategy_name(s["strategy"]),
+                    "Recommended asking price": s["proposed_list_price"],
+                    "Expected days to sale (P50)": s["additional_days_to_sale"]["p50"],
                     # Whole percent: NumberColumn's "%%" format does not scale the value.
-                    "Sold in 30d": s["sale_probabilities"]["within_30_days"] * 100.0,
-                    "P50 gross": s["expected_front_end_gross"]["p50"],
-                    "P50 net value": s["expected_net_economic_value"]["p50"],
-                    "P10 net value": s["expected_net_economic_value"]["p10"],
+                    "Chance of selling within 30 days": s["sale_probabilities"]["within_30_days"] * 100.0,
+                    "Expected front-end gross (P50)": s["expected_front_end_gross"]["p50"],
+                    "Expected total economic value (P50)": s["expected_net_economic_value"]["p50"],
+                    "Downside total economic value (P10)": s["expected_net_economic_value"]["p10"],
                 }
                 for s in result["pricing_scenarios"]
             ]
@@ -365,24 +373,28 @@ def render_vehicle_detail(workflow_context: WorkflowContext | None = None) -> No
             table,
             hide_index=True,
             column_config={
-                "List price": st.column_config.NumberColumn(format="$%d"),
-                "Price to market": st.column_config.NumberColumn(format="%.3f"),
-                "P50 days": st.column_config.NumberColumn(format="%d"),
-                "Sold in 30d": st.column_config.NumberColumn(format="%.0f%%"),
-                "P50 gross": st.column_config.NumberColumn(format="$%d"),
-                "P50 net value": st.column_config.NumberColumn(format="$%d"),
-                "P10 net value": st.column_config.NumberColumn(format="$%d"),
+                "Recommended asking price": st.column_config.NumberColumn(format="$%d"),
+                "Expected days to sale (P50)": st.column_config.NumberColumn(format="%d"),
+                "Chance of selling within 30 days": st.column_config.NumberColumn(format="%.0f%%"),
+                "Expected front-end gross (P50)": st.column_config.NumberColumn(format="$%d"),
+                "Expected total economic value (P50)": st.column_config.NumberColumn(format="$%d"),
+                "Downside total economic value (P10)": st.column_config.NumberColumn(format="$%d"),
             },
         )
+        st.caption("Compares how each asking price changes expected sales speed, profit, and "
+                   "total economic value. Price position vs similar vehicles and the customer "
+                   "value rating are in the comparable-listings section below.")
 
     with right:
-        st.subheader("Where the floor is")
+        st.subheader("Financial safety")
+        st.caption("Understand how far the asking price can move before crossing break-even or "
+                   "approval rules.")
         floors = break_even["floors"]
-        st.metric("Break-even", f"${break_even['current_accounting_break_even']:,.0f}")
-        st.metric("Minimum safe list price", f"${break_even['minimum_safe_list_price']:,.0f}")
+        st.metric(T.metric("break_even"), f"${break_even['current_accounting_break_even']:,.0f}")
+        st.metric(T.metric("min_safe"), f"${break_even['minimum_safe_list_price']:,.0f}")
         st.caption(
-            f"Binding constraint: **{floors['binding_constraint'].replace('_', ' ').title()}** · "
-            f"assumes {break_even['expected_discount_rate_used']:.1%} negotiation off list."
+            f"Rule setting the lowest safe price: **{floors['binding_constraint'].replace('_', ' ').title()}** · "
+            f"assumes {break_even['expected_discount_rate_used']:.1%} negotiation off asking price."
         )
 
         crossover = break_even["market_value_crossover_risk"]
@@ -402,22 +414,17 @@ def render_vehicle_detail(workflow_context: WorkflowContext | None = None) -> No
                 icon="⏳",
             )
 
-        st.metric("Maximum safe discount", f"${headroom['max_safe_discount']:,.0f}")
-        st.caption(
-            md(
-                f"Negotiation ${headroom['reserves']['negotiation_reserve']:,.0f} · "
-                f"Event ${headroom['reserves']['event_promotion_reserve']:,.0f} · "
-                f"Emergency ${headroom['reserves']['emergency_markdown_reserve']:,.0f}"
-            )
-        )
+        st.metric(T.metric("max_safe_discount"), f"${headroom['max_safe_discount']:,.0f}")
+        st.caption("Safe room for an additional discount before crossing the safety boundary.")
 
     # --- discount ladder --------------------------------------------------------------
 
     if headroom["ladder"]:
-        st.subheader("Where discounting stops paying")
+        st.subheader("How price reductions affect value")
         st.caption(
-            "Each rung is a separate simulation. The optimum is found by running them, not by "
-            "formula — it depends on this vehicle's holding cost, depreciation, and price position."
+            "See how additional price reductions change expected total economic value and "
+            "financial safety. The best point is found by running the simulation, not by a "
+            "formula — it depends on this vehicle's holding cost and depreciation."
         )
         ladder = pd.DataFrame(headroom["ladder"])
         ladder_figure = go.Figure()
@@ -426,17 +433,17 @@ def render_vehicle_detail(workflow_context: WorkflowContext | None = None) -> No
                 x=ladder["discount"],
                 y=ladder["p50_net_economic_value"],
                 mode="lines+markers",
-                name="P50 net economic value",
+                name="Expected total economic value (P50)",
             )
         )
         ladder_figure.add_vline(
             x=headroom["economically_sensible_discount"],
             line_dash="dash",
-            annotation_text=f"Optimum ${headroom['economically_sensible_discount']:,.0f}",
+            annotation_text=f"Best point ${headroom['economically_sensible_discount']:,.0f}",
         )
         ladder_figure.update_layout(
-            xaxis_title="Discount off list ($)",
-            yaxis_title="P50 net economic value ($)",
+            xaxis_title="Discount off asking price, $",
+            yaxis_title="Expected total economic value (P50), $",
             height=320,
             margin=dict(t=20, b=10),
         )
@@ -444,7 +451,9 @@ def render_vehicle_detail(workflow_context: WorkflowContext | None = None) -> No
 
     # --- comparables ------------------------------------------------------------------
 
-    st.subheader("Comparable listings")
+    st.subheader("Comparable vehicles")
+    st.caption("See whether the recommended asking price is high, low, or aligned with similar "
+               "vehicles.")
     included = [c for c in result["comparables"] if c["included"]]
     excluded = [c for c in result["comparables"] if not c["included"]]
 
@@ -472,7 +481,7 @@ def render_vehicle_detail(workflow_context: WorkflowContext | None = None) -> No
             )
         )
         comps_figure.update_layout(
-            xaxis_title="Mileage", yaxis_title="List price ($)", height=360,
+            xaxis_title="Mileage", yaxis_title="Asking price, $", height=360,
             margin=dict(t=20, b=10),
         )
         st.plotly_chart(comps_figure)
@@ -556,3 +565,5 @@ def render_vehicle_detail(workflow_context: WorkflowContext | None = None) -> No
             "The narration layer receives only this table. A currency figure in generated "
             "prose that does not appear here fails the response rather than reaching you."
         )
+
+    render_glossary()

@@ -1,7 +1,7 @@
 {
   "suite": "portfolio",
   "spec_ref": "product-spec.md §26.2",
-  "default_as_of": "2026-07-21T14:00:00Z",
+  "default_as_of": "2026-07-29T14:00:00Z",
   "baseline": {
     "total_physical_slots": 14,
     "current_inventory": 12,
@@ -102,8 +102,8 @@
       "id": "PF-07",
       "name": "Large inbound inventory conflict",
       "mutations": [
-        { "op": "append", "path": "inbound.vehicles", "value": { "inbound_id": "IN-2004", "expected_arrival_date": "2026-07-26", "segment": "SUV", "committed_slot": true, "acquisition_status": "PURCHASED", "estimated_cost_basis": 27500 } },
-        { "op": "append", "path": "inbound.vehicles", "value": { "inbound_id": "IN-2005", "expected_arrival_date": "2026-07-27", "segment": "SUV", "committed_slot": true, "acquisition_status": "PURCHASED", "estimated_cost_basis": 25900 } }
+        { "op": "append", "path": "inbound.vehicles", "value": { "inbound_id": "IN-2004", "expected_arrival_date": "2026-08-03", "segment": "SUV", "committed_slot": true, "acquisition_status": "PURCHASED", "estimated_cost_basis": 27500 } },
+        { "op": "append", "path": "inbound.vehicles", "value": { "inbound_id": "IN-2005", "expected_arrival_date": "2026-08-04", "segment": "SUV", "committed_slot": true, "acquisition_status": "PURCHASED", "estimated_cost_basis": 25900 } }
       ],
       "expect": {
         "warnings_must_include": ["INBOUND_CAPACITY_CONFLICT"],

@@ -55,8 +55,8 @@ The existing 12-vehicle `DEALER-1001` fixture already represents every required 
 | Manager-approval case | V-10005 (underwater/aged → approvals_required) |
 | Unrealistic-target risk | 70% target on this lot → promotion feasibility NOT_ACHIEVABLE |
 
-**Scenario:** `as_of = 2026-07-21 14:00Z` (injected clock via `MockTransport`), event **Summer
-Clearance** (`EVT-SUMMER-2026`, 2026-07-23 → 2026-07-27), target utilization 70%. This is the
+**Scenario:** `as_of = 2026-07-29 14:00Z` (injected clock via `MockTransport`), event **Summer
+Clearance** (`EVT-SUMMER-2026`, 2026-08-17 → 2026-08-21), target utilization 70%. This is the
 only event named; "July 4th" legitimately resolves to nothing.
 
 ---

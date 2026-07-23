@@ -19,12 +19,14 @@ import streamlit as st
 from pricing_agent.config import load_config
 from pricing_agent.mcp_clients import MockTransport, VautoClient
 from pricing_agent.skills.inventory_portfolio import analyze
+from pricing_agent.views import terminology as T
+from pricing_agent.views.glossary import render_glossary
 from pricing_agent.views.workflow_copy import render_workflow_header
 from pricing_agent.workflows.context import WorkflowContext
 
 import ui_components
 
-AS_OF = datetime(2026, 7, 21, 14, 0, tzinfo=timezone.utc)
+AS_OF = datetime(2026, 7, 29, 14, 0, tzinfo=timezone.utc)
 
 
 def md(text: str) -> str:
@@ -116,30 +118,35 @@ def render_dashboard(workflow_context: WorkflowContext | None = None) -> None:
     # --- KPI row ----------------------------------------------------------------------
 
     c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("Units on lot", capacity["current_inventory"],
-              f"{capacity['physical_open_slots']} open slots", delta_color="off")
-    c2.metric("Utilization", f"{capacity['current_utilization']:.0%}",
+    c1.metric(T.metric("units_on_lot"), capacity["current_inventory"],
+              f"{capacity['physical_open_slots']} spaces open", delta_color="off")
+    c2.metric(T.metric("lot_capacity_used"), f"{capacity['current_utilization']:.0%}",
               f"{capacity['current_utilization'] - capacity['target_utilization']:+.0%} vs target",
               delta_color="inverse")
-    c3.metric("Over 90 days", f"{aging['aged_concentration_pct'] * capacity['current_inventory']:.0f}",
+    c3.metric(T.metric("over_90"), f"{aging['aged_concentration_pct'] * capacity['current_inventory']:.0f}",
               f"{aging['aged_concentration_pct']:.0%} of lot", delta_color="off")
     c4.metric(
-        "Cash beyond floorplan",
+        T.metric("cash_tied_up"),
         f"${valuation['cash_tied_up']:,.0f}",
         f"${valuation['total_cost_basis']:,.0f} total cost basis",
         delta_color="off",
-        help="Cost basis less floorplan financing outstanding (§14.3).",
+        help="Cost basis less floorplan financing outstanding.",
     )
-    c5.metric("Below break-even", result["financial_risk"]["units_below_break_even"],
+    c5.metric(T.metric("below_break_even"), result["financial_risk"]["units_below_break_even"],
               f"${result['financial_risk']['total_exposure_below_break_even']:,.0f} exposure",
               delta_color="off")
 
-    for warning in result["warnings"]:
-        if warning["severity"] in ("BLOCKING", "CRITICAL", "HIGH"):
-            kind = SEVERITY_KIND[warning["severity"]]
-            getattr(st, kind)(md(f"**{warning['code']}** — {warning['message']}  \n_{warning['remediation']}_"))
+    shown = [w for w in result["warnings"] if w["severity"] in ("BLOCKING", "CRITICAL", "HIGH")]
+    for warning in shown:
+        kind = SEVERITY_KIND[warning["severity"]]
+        getattr(st, kind)(md(f"**{T.warning_label(warning['code'])}** — {warning['message']}  \n_{warning['remediation']}_"))
+    if shown:
+        with st.expander("View technical reason codes"):
+            st.caption("Warning codes: " + ", ".join(f"`{w['code']}`" for w in shown))
 
-    lot_tab, forecast_tab, risk_tab = st.tabs(["Lot", "Forecast", "Risk and actions"])
+    st.caption("Your lot today, and what it looks like over the next 30 and 90 days.")
+    lot_tab, forecast_tab, risk_tab = st.tabs(
+        ["Lot today", "Inventory outlook", "Vehicles needing attention"])
 
     # --- lot --------------------------------------------------------------------------
 
@@ -153,54 +160,57 @@ def render_dashboard(workflow_context: WorkflowContext | None = None) -> None:
                     # Thumbnail rather than the full asset: a dozen full-size images inlined
                     # into a dataframe would push megabytes through every rerun.
                     "Photo": ui_components.thumbnail_uri(vehicle.get("image_url")),
-                    "Action": ACTION_LABEL.get(action.get("action", ""), action.get("action", "")),
+                    "Suggested action": ACTION_LABEL.get(action.get("action", ""), action.get("action", "")),
                     "Stock": vid,
                     "Vehicle": f"{vehicle['year']} {vehicle['make']} {vehicle['model']}",
-                    "Days": vehicle["days_in_inventory"],
-                    "List price": vehicle.get("current_list_price"),
+                    "Days on lot": vehicle["days_in_inventory"],
+                    "Current asking price": vehicle.get("current_list_price"),
                     "Risk": risk.get(vid, {}).get("risk_score"),
                     # Scaled to whole percents: Streamlit's "%%" format takes the number
                     # literally, so a 1.0 fraction would render as "1%".
-                    "P(over 90d)": _pct(risk.get(vid, {}).get("prob_age_over_90")),
-                    "P(negative value)": _pct(risk.get(vid, {}).get("prob_negative_net_value")),
+                    "Risk of over 90 days": _pct(risk.get(vid, {}).get("prob_age_over_90")),
+                    "Chance of negative value": _pct(risk.get(vid, {}).get("prob_negative_net_value")),
                     "Why": action.get("matched_rule", ""),
                 }
             )
         frame = pd.DataFrame(rows).sort_values("Risk", ascending=False)
 
+        st.caption(
+            "Ranked by risk of remaining unsold too long, which weights time on lot, expected "
+            "value loss, chance of a negative outcome, and cost basis — so a $45,000 vehicle at "
+            "moderate risk outranks a $9,000 vehicle at high risk. Open **Price Inventory** for "
+            "any of these to see its recommended asking price and lowest safe price."
+        )
         st.dataframe(
             frame, hide_index=True,
             column_config={
                 "Photo": st.column_config.ImageColumn("Photo", width="small"),
-                "List price": st.column_config.NumberColumn(format="$%d"),
+                "Current asking price": st.column_config.NumberColumn(format="$%d"),
                 "Risk": st.column_config.ProgressColumn(format="%.0f", min_value=0, max_value=100),
-                "P(over 90d)": st.column_config.NumberColumn(format="%.0f%%"),
-                "P(negative value)": st.column_config.NumberColumn(format="%.0f%%"),
+                "Risk of over 90 days": st.column_config.NumberColumn(format="%.0f%%"),
+                "Chance of negative value": st.column_config.NumberColumn(format="%.0f%%"),
             },
-        )
-        st.caption(
-            "Sorted by risk, which weights aging, depreciation, negative-value probability and "
-            "**cost basis** — so a $45,000 unit at moderate risk outranks a $9,000 unit at high "
-            "risk. Open **Price Inventory** for any one of these to see its price "
-            "recommendation and floor."
         )
 
     # --- forecast ---------------------------------------------------------------------
 
     with forecast_tab:
         st.caption(
-            f"Run-off forecast: assumes no replacement purchases, because no tool supplies "
-            f"planned acquisitions. Ending inventory and revenue are **lower bounds**."
+            "What the lot is expected to sell and how full it stays. This is a forecast for "
+            "existing inventory only — it assumes no replacement purchases, so ending inventory "
+            "and revenue are cautious lower estimates."
         )
 
         for label, block in (("Next 30 days", one_month), ("Next 90 days", three_month)):
             st.subheader(label)
             units, revenue = block["unit_sales"], block["sales_revenue"]
             a, b, c, d = st.columns(4)
-            a.metric("Units sold (P50)", f"{units['p50']:.0f}", f"P10 {units['p10']:.0f} – P90 {units['p90']:.0f}", delta_color="off")
-            b.metric("Revenue (P50)", f"${revenue['p50']:,.0f}", f"P10 ${revenue['p10']:,.0f}", delta_color="off")
-            c.metric("Front-end gross (P50)", f"${block['front_end_gross']['p50']:,.0f}")
-            d.metric("Ending utilization (P50)", f"{block['ending_utilization']['p50']:.0%}")
+            a.metric("Expected vehicles sold (P50)", f"{units['p50']:.0f}",
+                     f"Range {units['p10']:.0f}–{units['p90']:.0f} (P10–P90)", delta_color="off")
+            b.metric("Expected revenue (P50)", f"${revenue['p50']:,.0f}",
+                     f"Downside (P10) ${revenue['p10']:,.0f}", delta_color="off")
+            c.metric("Expected front-end gross (P50)", f"${block['front_end_gross']['p50']:,.0f}")
+            d.metric("Expected lot capacity used (P50)", f"{block['ending_utilization']['p50']:.0%}")
 
             risk_probability = block["risk_probabilities"]["revenue_below_target"]
             if risk_probability is not None:
@@ -212,24 +222,26 @@ def render_dashboard(workflow_context: WorkflowContext | None = None) -> None:
             figure = go.Figure()
             figure.add_trace(
                 go.Bar(
-                    x=["P10", "P50", "P90"],
+                    x=["Downside (P10)", "Expected (P50)", "Conservative (P90)"],
                     y=[revenue["p10"], revenue["p50"], revenue["p90"]],
                     text=[f"${v:,.0f}" for v in (revenue["p10"], revenue["p50"], revenue["p90"])],
                     textposition="outside",
                 )
             )
             figure.update_layout(
-                height=260, yaxis_title="Revenue ($)", margin=dict(t=20, b=10), showlegend=False
+                height=260, yaxis_title="Revenue, $", margin=dict(t=20, b=10), showlegend=False
             )
             st.plotly_chart(figure)
 
-        st.subheader("Aging profile")
+        st.subheader("Inventory age breakdown")
+        st.caption("How the lot is distributed across time-on-lot ranges today, and how many "
+                   "vehicles in each range are expected to still be here next month.")
         aging_frame = pd.DataFrame(
             [
                 {
-                    "Bucket (days)": bucket["label"],
-                    "Units now": bucket["unit_count"],
-                    "Still here in 30d": bucket["projected_unit_count_at_horizon"],
+                    "Time on lot (days)": bucket["label"],
+                    "Vehicles now": bucket["unit_count"],
+                    "Expected still here in 30 days": bucket["projected_unit_count_at_horizon"],
                     "Cost basis": bucket["cost_basis"],
                 }
                 for bucket in aging["buckets"]
@@ -239,15 +251,13 @@ def render_dashboard(workflow_context: WorkflowContext | None = None) -> None:
             aging_frame, hide_index=True,
             column_config={"Cost basis": st.column_config.NumberColumn(format="$%d")},
         )
-        st.caption(
-            "The projected column comes from the draws, so *how much of the lot will be over "
-            "90 days next month* is answered rather than inferred."
-        )
 
     # --- risk -------------------------------------------------------------------------
 
     with risk_tab:
-        st.subheader("Where the money is at risk")
+        st.subheader("Vehicles needing attention")
+        st.caption("The vehicles with the most economic risk of remaining unsold too long, and "
+                   "the suggested inventory action for each.")
         for entry in result["top_risk_vehicles"][:6]:
             vehicle = next(v for v in vehicles if v["vehicle_id"] == entry["vehicle_id"])
             with st.container(border=True):
@@ -261,22 +271,22 @@ def render_dashboard(workflow_context: WorkflowContext | None = None) -> None:
                     f"**{vehicle['year']} {vehicle['make']} {vehicle['model']}**  \n"
                     f"{entry['vehicle_id']} · {vehicle['days_in_inventory']} days"
                 )
-                left.metric("Risk score", f"{entry['risk_score']:.0f}")
+                left.metric("Attention score", f"{entry['risk_score']:.0f}")
                 right.markdown(md(
                     "\n".join(f"- {factor}" for factor in entry["risk_factors"])
                     + f"\n- Cost basis ${entry['cost_basis']:,.0f}"
-                    + f"\n\n**Recommended action:** "
+                    + f"\n\n**Suggested inventory action:** "
                     + ACTION_LABEL.get(
                         actions[entry["vehicle_id"]]["action"],
                         actions[entry["vehicle_id"]]["action"],
                     )
                 ))
 
-        st.subheader("All warnings")
+        st.subheader("All alerts")
         for warning in result["warnings"]:
-            st.markdown(
-                md(f"`{warning['severity']}` **{warning['code']}** — {warning['message']}")
-            )
+            st.markdown(md(f"**{T.warning_label(warning['code'])}** — {warning['message']}"))
+        with st.expander("View technical reason codes"):
+            st.caption("Warning codes: " + ", ".join(f"`{w['code']}`" for w in result["warnings"]))
 
         with st.expander("Data coverage and audit"):
             st.json(result["data_coverage"])
@@ -290,8 +300,9 @@ def render_dashboard(workflow_context: WorkflowContext | None = None) -> None:
                 hide_index=True,
             )
 
+    render_glossary()
     st.info(
-        "Forecasts are a **configured prototype simulation**, not a trained prediction. "
-        "Every assumption is in `config/assumptions/`.",
+        "Forecasts are a **configured prototype simulation**, not a trained prediction, and "
+        "every recommendation should be reviewed before acting.",
         icon="ℹ️",
     )

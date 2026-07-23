@@ -37,7 +37,7 @@ both depend on it, so it is mandatory rather than conventional.
   "data": { },
   "meta": {
     "source": "VAUTO | INTERNAL_COST | INTERNAL_CAPACITY | INTERNAL_EVENT | CONFIG",
-    "data_timestamp": "2026-07-21T09:15:00Z",
+    "data_timestamp": "2026-07-29T09:15:00Z",
     "source_version": "vauto-mcp-0.3.0",
     "confidence": "HIGH | MEDIUM | LOW | UNKNOWN",
     "coverage": 0.94,

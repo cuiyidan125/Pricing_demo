@@ -216,7 +216,7 @@ def test_single_vehicle_request_rejects_a_computed_field(registry):
         "request_id": "req_1",
         "dealer_id": "DEALER-1001",
         "user_id": "u_1",
-        "as_of": "2026-07-21T14:00:00Z",
+        "as_of": "2026-07-29T14:00:00Z",
         "vehicle": {"year": 2022, "make": "Toyota", "model": "RAV4"},
         "extraction_provenance": [{"field": "year", "source": "USER_STATED"}],
         "recommended_price": 28995,

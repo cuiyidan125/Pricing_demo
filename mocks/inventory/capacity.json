@@ -13,7 +13,7 @@
   },
   "meta": {
     "source": "INTERNAL_CAPACITY",
-    "data_timestamp": "2026-07-21T12:15:00Z",
+    "data_timestamp": "2026-07-29T12:15:00Z",
     "source_version": "capacity-mcp-mock-0.1.0",
     "confidence": "HIGH",
     "coverage": 1.0,

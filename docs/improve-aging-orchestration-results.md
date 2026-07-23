@@ -116,9 +116,14 @@ its consolidated action is PROTECT_PRICE, never EVENT_PROMOTION. The workspace s
 
 The reproducible demo scenario (an event that truly exists in the calendar; injected clock):
 
-- **as_of** 2026-07-21 14:00Z (via `MockTransport`, never the wall clock)
-- **event** Summer Clearance (`EVT-SUMMER-2026`), 2026-07-23 → 2026-07-27
+- **as_of** 2026-07-29 14:00Z (via `MockTransport`, never the wall clock)
+- **event** Summer Clearance (`EVT-SUMMER-2026`), 2026-08-17 → 2026-08-21
 - **target** 70% utilization
+
+> Scenario dates were moved forward so the demo reads as forward-looking from a late-July
+> vantage. The event now sits 19 days after `as_of` (a 23-day promotion horizon vs 6 before),
+> which legitimately changes the promotion outcome — see the note on the "unrealistic target"
+> row below.
 
 No mock data was added — the existing 12-vehicle `DEALER-1001` fixture already contains every
 required element. Result:
@@ -135,7 +140,7 @@ required element. Result:
 | Protected — recently acquired | V-10007 (29d), V-10010 (26d) |
 | Excluded — campaign | V-10011 (`CAMP-JUNE-2026`) |
 | Manager-approval cases | present — 17 approvals across the analysed cohort |
-| Unrealistic target | 70% → promotion feasibility NOT_ACHIEVABLE (hits target 0.85%) |
+| Target at the new window | 70% → feasibility **AT_RISK** (hits target ~43%), required reduction 2, ending inventory P50 10. A tighter 60% target still yields NOT_ACHIEVABLE, so both states remain demonstrable. |
 
 Selected candidates (7), excluded (5): V-10003, V-10007, V-10009, V-10010, V-10011.
 
@@ -191,10 +196,10 @@ was rewritten for the working workspace.
 | # | Scenario | Result |
 | --- | --- | --- |
 | 1 | Aging diagnosis without event | ROUTED_AND_EXECUTED, promotion skipped, joint figures marked unavailable |
-| 2 | Valid Summer Clearance event | full pipeline, TARGET_NOT_ACHIEVABLE with complete evidence |
+| 2 | Valid Summer Clearance event | full pipeline; at the new window, feasibility AT_RISK (~43%) with complete evidence |
 | 3 | Invalid July 4th event | NEEDS_CLARIFICATION, no substitution, promotion not run |
 | 4 | Missing target utilization | ROUTED_AND_EXECUTED (diagnosis + per-vehicle actions) |
-| 5 | Unrealistic target | TARGET_NOT_ACHIEVABLE (70% → 0.85% chance) |
+| 5 | Unrealistic target | TARGET_NOT_ACHIEVABLE (60% probe → ~19% chance) |
 | 6 | Partial skill failure | PARTIAL_RESULT, completed results preserved, gap named |
 | 7 | Protected-price vehicle | V-10007 / V-10010 excluded and held from promotion |
 | 8 | Manager-approval case | 17 approvals surfaced, MANAGER_REVIEW / WHOLESALE actions |

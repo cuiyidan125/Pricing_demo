@@ -26,10 +26,11 @@ import streamlit as st
 
 from pricing_agent.agents import run_assistant
 from pricing_agent.agents.assistant import AssistantResponse, AssistantState
+from pricing_agent.views import terminology as T
 from pricing_agent.workflows.context import WorkflowContext
 from pricing_agent.workflows.pages import page_for
 
-AS_OF = datetime(2026, 7, 21, 14, 0, tzinfo=timezone.utc)
+AS_OF = datetime(2026, 7, 29, 14, 0, tzinfo=timezone.utc)
 
 # Stable, non-widget session keys. Streamlit garbage-collects the state of any widget that
 # is not rendered on a run, so the request and its result are held under plain keys that
@@ -108,14 +109,14 @@ def render_assistant_home(
     )
 
     request = st.text_area(
-        "Your question",
+        "What are you trying to decide?",
         key="assistant_input",
         placeholder="e.g. What should I price 2020 Ford F-150 XLT?",
         height=110,
     )
 
     left, right = st.columns([1, 4])
-    submitted = left.button("Analyze", type="primary")
+    submitted = left.button("Get recommendation", type="primary")
     right.caption("Suggested questions — copy one into the box above.")
 
     for prompt in SUGGESTED_PROMPTS:
@@ -207,29 +208,31 @@ def _render_improve_aging_result(response: AssistantResponse) -> None:
     util, tgt = s.get("current_utilization"), s.get("target_utilization")
     c1, c2, c3 = st.columns(3)
     c1.metric(
-        "Utilization → target",
+        "Lot capacity used → target",
         f"{util:.0%}" if isinstance(util, (int, float)) else "—",
         (f"target {tgt:.0%}" if isinstance(tgt, (int, float)) else "no target"),
         delta_color="off",
     )
-    c2.metric("Target status", "No event" if target == "NO_EVENT" else target.replace("_", " ").title())
-    c3.metric("Action candidates", s.get("candidate_count", 0),
+    c2.metric("Target likelihood",
+              "No event" if target == "NO_EVENT" else T.feasibility_label(target))
+    c3.metric("Vehicles requiring action", s.get("candidate_count", 0),
               f"{s.get('deep_analysed_count', 0)} analysed", delta_color="off")
 
     bits = []
     if s.get("recommended_plan"):
-        bits.append(f"recommended plan **{s['recommended_plan'].replace('_', ' ').title()}**")
+        bits.append(f"recommended approach **{T.plan_name(s['recommended_plan'])}**")
     prob = s.get("probability_target_achieved")
     if isinstance(prob, (int, float)):
-        bits.append(f"hits target **{prob:.0%}** of the time")
+        bits.append(f"reaches the target **{prob:.0%}** of the time")
     if s.get("approvals_required"):
-        bits.append(f"**{s['approvals_required']}** approval(s) required")
+        bits.append(f"**{s['approvals_required']}** manager review(s) required")
     if bits:
         st.caption(" · ".join(bits))
 
     # Top one or two warnings only — the workspace shows the full set.
     for warning in response.warnings[:2]:
-        st.caption(f"⚠️ `{warning.get('code')}` — {md(str(warning.get('message', '')))[:110]}")
+        st.caption(f"⚠️ {md(T.warning_label(warning.get('code', '')))} — "
+                   f"{md(str(warning.get('message', '')))[:110]}")
 
     if response.target_url:
         _open_workflow_link(response.target_url, "Open the full Improve Aging workspace →")
@@ -240,24 +243,24 @@ def _render_improve_aging_result(response: AssistantResponse) -> None:
 def _render_pricing_result(response: AssistantResponse) -> None:
     s = response.summary
     st.success(
-        f"**{s.get('vehicle', response.resolved_vehicle_id)}** — priced with the "
-        f"single-vehicle valuation skill (`{response.resolved_vehicle_id}`).",
+        f"**{s.get('vehicle', response.resolved_vehicle_id)}** — priced against the local "
+        f"market (`{response.resolved_vehicle_id}`).",
         icon="✅",
     )
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Current list", _money(s.get("current_list_price")))
-    c2.metric("Recommended", _money(s.get("recommended_price")))
+    c1.metric("Current asking price", _money(s.get("current_list_price")))
+    c2.metric("Recommended asking price", _money(s.get("recommended_price")))
     c3.metric(
-        "Days to sell (P50)", f"{s.get('p50_days_to_sale', 0):.0f}",
-        f"P90 {s.get('p90_days_to_sale', 0):.0f}", delta_color="off",
+        "Expected days to sale (P50)", f"{s.get('p50_days_to_sale', 0):.0f}",
+        f"Conservative (P90) {s.get('p90_days_to_sale', 0):.0f}", delta_color="off",
     )
-    c4.metric("Break-even", _money(s.get("break_even_price")))
+    c4.metric("Break-even price", _money(s.get("break_even_price")))
 
     st.caption(
-        f"Promotional headroom {_money(s.get('promotional_headroom'))} · "
-        f"strategy **{str(s.get('strategy', '')).replace('_', ' ').title()}**. "
-        "Every figure is read from the skill result — the assistant computes nothing."
+        f"Safe room for an additional discount {_money(s.get('promotional_headroom'))} · "
+        f"recommended pricing approach **{T.strategy_name(str(s.get('strategy', '')))}**. "
+        "Every figure is read from the analysis — the assistant computes nothing."
     )
 
     _render_warnings(response)
@@ -289,16 +292,17 @@ def _render_portfolio_result(response: AssistantResponse) -> None:
 
 def _render_promotion_result(response: AssistantResponse) -> None:
     s = response.summary
-    st.success(f"Planned the **{s.get('event_name')}** event with the promotion planner.", icon="✅")
+    st.success(f"Built a sale-event plan for the **{s.get('event_name')}** event.", icon="✅")
 
     c1, c2, c3 = st.columns(3)
-    c1.metric("Feasibility", str(s.get("feasibility_status", "")).replace("_", " ").title())
-    c2.metric("Incremental sales needed", s.get("incremental_required", "—"))
-    c3.metric("Hits target", f"{s.get('probability_target_achieved', 0):.0%}")
+    c1.metric("Target likelihood", T.feasibility_label(str(s.get("feasibility_status", ""))))
+    c2.metric("Additional sales needed", s.get("incremental_required", "—"))
+    c3.metric("Reaches the target", f"{s.get('probability_target_achieved', 0):.0%}")
 
     st.caption(
-        f"Target ending inventory {s.get('target_ending_inventory')} · recommended plan "
-        f"**{str(s.get('recommended_plan', '')).replace('_', ' ').title()}**."
+        f"Target ending inventory {s.get('target_ending_inventory')} · recommended approach "
+        f"**{T.plan_name(str(s.get('recommended_plan', '')))}**. A plan improves the odds; it "
+        "does not guarantee sales."
     )
 
     _render_warnings(response)

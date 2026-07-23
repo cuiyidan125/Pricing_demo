@@ -22,6 +22,8 @@ import streamlit as st
 
 from pricing_agent.mcp_clients import MockTransport, VautoClient
 from pricing_agent.views import improve_aging_copy as copy
+from pricing_agent.views import terminology as T
+from pricing_agent.views.glossary import render_glossary
 from pricing_agent.views.workflow_copy import render_workflow_header
 from pricing_agent.workflows.context import WorkflowContext
 from pricing_agent.workflows.improve_aging import (
@@ -30,7 +32,7 @@ from pricing_agent.workflows.improve_aging import (
     run_improve_aging,
 )
 
-AS_OF = datetime(2026, 7, 21, 14, 0, tzinfo=timezone.utc)
+AS_OF = datetime(2026, 7, 29, 14, 0, tzinfo=timezone.utc)
 
 DEMO_REQUEST = ImproveAgingRequest(
     target_utilization=0.70,
@@ -42,11 +44,11 @@ DEMO_REQUEST = ImproveAgingRequest(
 
 # The five business steps the default summary shows, mapped from the technical trace.
 BUSINESS_STEPS = (
-    ("Diagnose portfolio", "PORTFOLIO_FORECAST", "inventory-portfolio-forecast"),
-    ("Select candidates", "CANDIDATE_SELECTION", None),
-    ("Analyze selected vehicles", "SINGLE_VEHICLE_VALUATION", "single-vehicle-valuation"),
-    ("Build promotion plan", "PROMOTION_PLAN", "dealer-event-promotion-planner"),
-    ("Consolidate action plan", "CONSOLIDATE", None),
+    ("Review the lot", "PORTFOLIO_FORECAST", "inventory-portfolio-forecast"),
+    ("Identify vehicles requiring action", "CANDIDATE_SELECTION", None),
+    ("Evaluate pricing options", "SINGLE_VEHICLE_VALUATION", "single-vehicle-valuation"),
+    ("Build the sale-event plan", "PROMOTION_PLAN", "dealer-event-promotion-planner"),
+    ("Create the dealer action plan", "CONSOLIDATE", None),
 )
 
 # Recommended-plan card ordering: conservative → recommended → aggressive.
@@ -112,6 +114,7 @@ def render_improve_aging(workflow_context: WorkflowContext | None = None) -> Non
     _plan_comparison(result)
     _warnings_and_approvals(result)
     _five_step_summary(result)
+    render_glossary()
     _full_trace(result)
     _disclosure()
 
@@ -136,17 +139,17 @@ def executive_metrics(result) -> dict:
 
 def _executive_summary(result) -> None:
     m = executive_metrics(result)
-    status = "No event" if m["target_status"] == "NO_EVENT" else m["target_status"].replace("_", " ").title()
+    status = "No event" if m["target_status"] == "NO_EVENT" else T.feasibility_label(m["target_status"])
 
     c = st.columns(5)
-    c[0].metric("Current utilization", _pct(m["current_utilization"]))
-    c[1].metric("Target utilization",
+    c[0].metric("Current lot capacity used", _pct(m["current_utilization"]))
+    c[1].metric("Target lot capacity",
                 _pct(m["target_utilization"]) if m["target_utilization"] is not None else "—")
-    c[2].metric("Units to release",
+    c[2].metric("Vehicles to sell or release",
                 m["required_unit_reduction"] if m["required_unit_reduction"] is not None else "—")
-    c[3].metric("Action candidates", m["candidate_count"])
+    c[3].metric("Vehicles requiring action", m["candidate_count"])
     prob = m["probability_target_achieved"]
-    c[4].metric("Target status", status,
+    c[4].metric("Target likelihood", status,
                 _pct(prob) + " likely" if isinstance(prob, (int, float)) else None,
                 delta_color="off")
 
@@ -262,7 +265,7 @@ def _recommended_plan(result) -> None:
     promotion = result.promotion_result
     if promotion is None:
         return
-    st.subheader("Recommended plan")
+    st.subheader("Recommended sale-event approach")
     rec = promotion["recommended_plan"]
     plan = next((p for p in promotion["plans"] if p["plan_type"] == rec["plan_type"]), None)
     if plan is None:
@@ -270,28 +273,28 @@ def _recommended_plan(result) -> None:
     o = plan["outcomes"]
     d = result.portfolio_summary
 
-    st.markdown(f"### {rec['plan_type'].replace('_', ' ').title()}  "
-                f"·  _{PLAN_STANCE.get(rec['plan_type'], '')} stance_")
-    if rec.get("rationale_codes"):
-        st.caption("Why: " + ", ".join(f"`{c}`" for c in rec["rationale_codes"]))
+    st.markdown(f"### {T.plan_name(rec['plan_type'])}")
+    st.caption(T.plan_trade_off(rec["plan_type"]))
+    with st.expander("View technical reason codes"):
+        st.caption("Rationale codes: " + ", ".join(f"`{c}`" for c in rec.get("rationale_codes", [])))
 
     c = st.columns(4)
-    c[0].metric("Ending inventory (P50)", f"{o['ending_inventory']['p50']:.0f}",
-                f"util {_pct(o['ending_utilization']['p50'])}", delta_color="off")
-    c[1].metric("Hits target", _pct(o["probability_target_achieved"]))
-    c[2].metric("Gross impact (P50)", _usd(o["gross_impact"]["p50"]))
-    c[3].metric("Approvals required", len(result.approvals_required))
+    c[0].metric("Expected ending inventory (P50)", f"{o['ending_inventory']['p50']:.0f}",
+                f"lot capacity used {_pct(o['ending_utilization']['p50'])}", delta_color="off")
+    c[1].metric("Likelihood of reaching the target", _pct(o["probability_target_achieved"]))
+    c[2].metric("Expected gross impact (P50)", _usd(o["gross_impact"]["p50"]))
+    c[3].metric("Manager reviews required", len(result.approvals_required))
 
     c2 = st.columns(3)
     hs = (d.get("expected_holding_cost_savings") or {}).get("p50")
     ds = (d.get("expected_depreciation_savings") or {}).get("p50")
-    c2[0].metric("Holding-cost savings (P50)", _usd(hs) if hs is not None else "Not available")
-    c2[1].metric("Depreciation savings (P50)", _usd(ds) if ds is not None else "Not available")
+    c2[0].metric("Expected holding-cost savings (P50)", _usd(hs) if hs is not None else "Not available")
+    c2[1].metric("Expected depreciation savings (P50)", _usd(ds) if ds is not None else "Not available")
     c2[2].metric("Dealer-funded discount", _usd(plan["totals"]["total_dealer_funded"]))
 
     if result.state is WorkflowState.TARGET_NOT_ACHIEVABLE:
-        st.caption("This is the most aggressive safe plan — it still does **not** reach the "
-                   "target. It does not guarantee the target; see the gap above.")
+        st.caption("This is the most aggressive safe approach — it still does **not** reach the "
+                   "target, and no plan guarantees sales. See the gap above.")
     if result.held_from_promotion:
         st.caption("🛡️ Held back from promotion by workflow protection: "
                    + ", ".join(result.held_from_promotion))
@@ -322,21 +325,23 @@ def _vehicles_requiring_action(result) -> None:
         days = (scenario.get("additional_days_to_sale") or {})
         rows.append({
             "Vehicle": ev.description if ev else a["vehicle_id"],
-            "Action": copy.action_label(a["recommended_action"]),
-            "Current": a.get("current_price"),
-            "Days P50": days.get("p50"),
-            "Days P90": days.get("p90"),
-            "Break-even": be.get("current_accounting_break_even"),
-            "Approvals": len(a["approvals_required"]),
-            "Why": ", ".join(copy.selection_label(c) for c in a["reason_codes"]),
+            "Recommended action": copy.action_label(a["recommended_action"]),
+            "Why action is needed": ", ".join(copy.selection_label(c) for c in a["reason_codes"]),
+            "Current asking price": a.get("current_price"),
+            "Expected days to sale (P50)": days.get("p50"),
+            "Conservative days to sale (P90)": days.get("p90"),
+            "Break-even price": be.get("current_accounting_break_even"),
+            "Approval needed": "Yes" if a["approvals_required"] else "No",
         })
+    st.caption("The aged vehicles to act on, ordered by attention. Each row is a separate "
+               "single-vehicle analysis — shown side by side, never combined.")
     st.dataframe(
         pd.DataFrame(rows), hide_index=True,
         column_config={
-            "Current": st.column_config.NumberColumn(format="$%d"),
-            "Break-even": st.column_config.NumberColumn(format="$%d"),
-            "Days P50": st.column_config.NumberColumn(format="%.0f"),
-            "Days P90": st.column_config.NumberColumn(format="%.0f"),
+            "Current asking price": st.column_config.NumberColumn(format="$%d"),
+            "Break-even price": st.column_config.NumberColumn(format="$%d"),
+            "Expected days to sale (P50)": st.column_config.NumberColumn(format="%.0f"),
+            "Conservative days to sale (P90)": st.column_config.NumberColumn(format="%.0f"),
         },
     )
     with st.expander("Raw reason codes & per-vehicle simulation ids (audit)"):
@@ -363,21 +368,23 @@ def _vehicles_excluded(result, facts: dict) -> None:
     if result.selection is None or not result.selection.exclusions:
         st.caption("No vehicles were excluded.")
         return
+    st.caption("Vehicles held back from action, each with the reason and whether it is a "
+               "safety rule, a business rule, or a data limitation.")
     rows = []
     for e in result.selection.exclusions:
         fact = facts.get(e.vehicle_id, {})
         rows.append({
             "Vehicle": e.description,
-            "Why": "; ".join(copy.exclusion_label(c) for c in e.reason_codes),
-            "Days": fact.get("days_in_inventory"),
+            "Why protected or excluded": "; ".join(copy.exclusion_label(c) for c in e.reason_codes),
+            "Days on lot": fact.get("days_in_inventory"),
             "Status": (fact.get("status") or "ACTIVE").title(),
             "Rule type": copy.exclusion_category(e.reason_codes),
         })
     st.dataframe(
         pd.DataFrame(rows), hide_index=True,
-        column_config={"Days": st.column_config.NumberColumn(format="%.0f")},
+        column_config={"Days on lot": st.column_config.NumberColumn(format="%.0f")},
     )
-    with st.expander("Raw exclusion codes (audit)"):
+    with st.expander("View technical reason codes"):
         st.dataframe(
             pd.DataFrame([{"Vehicle": e.description, "Codes": ", ".join(e.reason_codes)}
                          for e in result.selection.exclusions]),
@@ -416,25 +423,26 @@ def _plan_comparison(result) -> None:
     promotion = result.promotion_result
     if promotion is None:
         return
-    st.subheader("Plan comparison")
+    st.subheader("Compare sale-event approaches")
+    st.caption("Each approach makes a different trade-off between protecting profit and freeing "
+               "lot space. A plan improves the odds; it does not guarantee sales.")
     rec = promotion["recommended_plan"]["plan_type"]
     rows = []
     for plan in promotion["plans"]:
         o = plan["outcomes"]
         rows.append({
-            "Plan": plan["plan_type"].replace("_", " ").title(),
-            "Stance": PLAN_STANCE.get(plan["plan_type"], ""),
-            "Vehicles": plan["totals"]["vehicle_count"],
-            "Dealer-funded": plan["totals"]["total_dealer_funded"],
-            "Incremental (P50)": o["incremental_units_sold"]["p50"],
-            "Hits target": o["probability_target_achieved"],
+            "Sale-event approach": T.plan_name(plan["plan_type"]),
+            "Vehicles in the event": plan["totals"]["vehicle_count"],
+            "Dealer-funded discount": plan["totals"]["total_dealer_funded"],
+            "Expected additional sales (P50)": o["incremental_units_sold"]["p50"],
+            "Target likelihood": o["probability_target_achieved"],
             "Recommended": "★" if plan["plan_type"] == rec else "",
         })
     st.dataframe(
         pd.DataFrame(rows), hide_index=True,
         column_config={
-            "Dealer-funded": st.column_config.NumberColumn(format="$%d"),
-            "Hits target": st.column_config.NumberColumn(format="%.0f%%"),
+            "Dealer-funded discount": st.column_config.NumberColumn(format="$%d"),
+            "Target likelihood": st.column_config.NumberColumn(format="%.0f%%"),
         },
     )
 
@@ -443,30 +451,39 @@ def _plan_comparison(result) -> None:
 
 
 def _warnings_and_approvals(result) -> None:
-    st.subheader("Warnings and approvals")
+    st.subheader("What to review, and manager reviews required")
     if result.approvals_required:
+        st.caption("These recommendations require a manager review before anything changes.")
         by_vehicle: dict[str, list[str]] = {}
         for a in result.approvals_required:
             kind = a.get("approval_type") or a.get("type") or "REVIEW"
             by_vehicle.setdefault(a.get("vehicle_id") or "—", []).append(kind)
         st.dataframe(
             pd.DataFrame([
-                {"Vehicle": vid, "Approvals": ", ".join(sorted(set(kinds)))}
+                {"Vehicle": vid,
+                 "Why a review is needed": "; ".join(dict.fromkeys(T.approval_why(k) for k in kinds))}
                 for vid, kinds in by_vehicle.items()
             ]),
             hide_index=True,
         )
     else:
-        st.caption("No approvals required.")
+        st.caption("No manager reviews required.")
 
+    labels = sorted(
+        {T.warning_label(w["code"]) for ev in result.vehicle_evidence for w in ev.warnings}
+        | {T.warning_label(w["code"]) for w in (result.promotion_result or {}).get("warnings", [])}
+        | {T.warning_label(w["code"]) for w in (result.portfolio_result or {}).get("warnings", [])}
+    )
+    if labels:
+        st.markdown("**What to review:** " + " · ".join(labels))
     codes = sorted(
         {w["code"] for ev in result.vehicle_evidence for w in ev.warnings}
         | {w["code"] for w in (result.promotion_result or {}).get("warnings", [])}
         | {w["code"] for w in (result.portfolio_result or {}).get("warnings", [])}
     )
     if codes:
-        st.caption("Warning codes across the diagnosis, vehicles, and plan: "
-                   + ", ".join(f"`{c}`" for c in codes))
+        with st.expander("View technical reason codes"):
+            st.caption("Warning codes: " + ", ".join(f"`{c}`" for c in codes))
 
 
 # --- 10. five-step workflow summary ---------------------------------------------------

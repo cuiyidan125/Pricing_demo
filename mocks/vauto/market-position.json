@@ -20,7 +20,7 @@
   },
   "meta": {
     "source": "VAUTO",
-    "data_timestamp": "2026-07-21T08:00:00Z",
+    "data_timestamp": "2026-07-29T08:00:00Z",
     "source_version": "vauto-mcp-mock-0.1.0",
     "confidence": "MEDIUM",
     "coverage": 1.0,

@@ -3,15 +3,15 @@
     "dealer_id": "DEALER-1001",
     "inbound_count": 3,
     "vehicles": [
-      { "inbound_id": "IN-2001", "expected_arrival_date": "2026-07-25", "segment": "SUV", "committed_slot": true,  "acquisition_status": "PURCHASED", "estimated_cost_basis": 26400 },
-      { "inbound_id": "IN-2002", "expected_arrival_date": "2026-07-29", "segment": "TRUCK", "committed_slot": true,  "acquisition_status": "PURCHASED", "estimated_cost_basis": 31200 },
-      { "inbound_id": "IN-2003", "expected_arrival_date": "2026-08-04", "segment": "SEDAN", "committed_slot": false, "acquisition_status": "BID_PENDING", "estimated_cost_basis": 18900 }
+      { "inbound_id": "IN-2001", "expected_arrival_date": "2026-08-02", "segment": "SUV", "committed_slot": true,  "acquisition_status": "PURCHASED", "estimated_cost_basis": 26400 },
+      { "inbound_id": "IN-2002", "expected_arrival_date": "2026-08-06", "segment": "TRUCK", "committed_slot": true,  "acquisition_status": "PURCHASED", "estimated_cost_basis": 31200 },
+      { "inbound_id": "IN-2003", "expected_arrival_date": "2026-08-12", "segment": "SEDAN", "committed_slot": false, "acquisition_status": "BID_PENDING", "estimated_cost_basis": 18900 }
     ],
     "_note": "Only committed_slot: true units count as confirmed_inbound (2), matching capacity.json. IN-2003 is not committed and is excluded from the capacity flow, which is what keeps the two tools consistent."
   },
   "meta": {
     "source": "INTERNAL_CAPACITY",
-    "data_timestamp": "2026-07-21T12:15:00Z",
+    "data_timestamp": "2026-07-29T12:15:00Z",
     "source_version": "capacity-mcp-mock-0.1.0",
     "confidence": "MEDIUM",
     "coverage": 1.0,
