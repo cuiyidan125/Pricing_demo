@@ -50,7 +50,7 @@ use.
 ### Tests
 
 ```bash
-python -m pytest tests -q            # 410 tests
+python -m pytest tests -q            # 455 tests
 python scripts/validate_schemas.py   # 62 checks: schemas, refs, fixtures, scenarios
 ```
 
@@ -69,6 +69,13 @@ Five words, used consistently:
 | **Skill** | A reusable capability a workflow calls. There are three, and none of them is a menu item. |
 | **MCP tool** | A read adapter over a system of record (vAuto, DMS, dealer costs), plus one isolated write client. |
 | **Dashboard** | A view that renders a finished result. Views never calculate. |
+
+The interface is written for a dealer, not an engineer: business meaning leads and the
+statistical term (P50/P90/P10) sits in parentheses — "Expected days to sale (P50)", not "P50
+Days to Sale". Every page carries a **How to read these estimates** glossary, and raw reason
+codes, request/simulation IDs, and assumptions live in collapsed audit expanders. All
+user-facing copy is centralized in `src/pricing_agent/views/terminology.py`. See
+`docs/dealer-friendly-language-results.md`.
 
 Navigation is declared as data in `src/pricing_agent/workflows/registry.py`, so the sidebar
 and the product's vocabulary cannot drift apart:

@@ -235,7 +235,7 @@ def aging_timeline(
             x=[days_in_inventory],
             base=0,
             orientation="h",
-            name="Days on the lot",
+            name="Time on lot",
             marker=dict(color="rgba(100,116,139,0.85)"),
             hovertemplate="On the lot %{x:.0f} days<extra></extra>",
         )
@@ -246,7 +246,7 @@ def aging_timeline(
             x=[additional_p50],
             base=days_in_inventory,
             orientation="h",
-            name="Projected to sale (P50)",
+            name="Expected time to sale (P50)",
             marker=dict(color="rgba(59,130,246,0.75)"),
             error_x=dict(
                 type="data",
@@ -272,7 +272,7 @@ def aging_timeline(
         barmode="stack",
         height=190,
         margin=dict(t=34, b=10, l=10, r=10),
-        xaxis_title="Days since acquisition",
+        xaxis_title="Days on lot",
         yaxis=dict(showticklabels=False),
         legend=dict(orientation="h", yanchor="bottom", y=-0.55, x=0),
     )

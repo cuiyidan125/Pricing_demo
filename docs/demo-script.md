@@ -12,6 +12,11 @@ on top, then **Acquire / Price / Merchandise / Improve Aging Inventory**. If som
 where the three skills are, that is the right question — they sit underneath the
 workflows, and a workflow can use more than one.
 
+The language is dealer-first: labels lead with the business meaning and put the statistic in
+parentheses ("Expected days to sale (P50)"). If an interviewer asks what P50/P90 mean, open the
+**How to read these estimates** expander on any page — expected (P50), conservative (P90),
+downside (P10), stated plainly.
+
 ---
 
 ## Beat 0 — Ask the assistant (45s)

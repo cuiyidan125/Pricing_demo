@@ -18,6 +18,8 @@ import streamlit as st
 
 from pricing_agent.mcp_clients import EventClient, MockTransport, VautoClient
 from pricing_agent.skills.promotion_planner import plan_event
+from pricing_agent.views import terminology as T
+from pricing_agent.views.glossary import render_glossary
 from pricing_agent.views.workflow_copy import render_workflow_header
 from pricing_agent.workflows.context import WorkflowContext
 
@@ -105,25 +107,26 @@ def render_promotion_planner(workflow_context: WorkflowContext | None = None) ->
     kind, icon = FEASIBILITY_STYLE.get(feasibility["status"], ("info", "•"))
     getattr(st, kind)(
         md(
-            f"**{feasibility['status'].replace('_', ' ').title()}** — "
-            f"the target needs **{feasibility['required_incremental_units']} incremental sale(s)** "
+            f"**Target likelihood: {T.feasibility_label(feasibility['status'])}** — "
+            f"the target needs **{feasibility['required_incremental_units']} additional sale(s)** "
             f"inside a {feasibility['event_duration_days']}-day window. The most aggressive safe "
             f"plan delivers **{plans['CAPACITY_FIRST']['outcomes']['incremental_units_sold']['mean']:.1f} "
-            f"on average**, and hits the target in "
-            f"**{feasibility['probability_target_achieved']:.0%}** of simulated outcomes."
+            f"on average**, and reaches the target in "
+            f"**{feasibility['probability_target_achieved']:.0%}** of simulated outcomes. "
+            "A sale-event plan improves the odds; it does not guarantee sales."
         ),
         icon=icon,
     )
 
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Target ending inventory", target_block["target_ending_inventory"],
-              f"{target:.0%} of {target_block['total_physical_slots']} slots", delta_color="off")
-    c2.metric("Projected without promotion",
+              f"{target:.0%} of {target_block['total_physical_slots']} spaces", delta_color="off")
+    c2.metric("Expected without the event (P50)",
               f"{target_block['projected_inventory_without_promotion']['p50']:.0f}",
-              "P50", delta_color="off")
-    c3.metric("Incremental sales required", target_block["incremental_promotional_sales_required"])
-    c4.metric("Eligible candidates", feasibility["max_safe_candidate_pool"],
-              f"{len(result['excluded_vehicles'])} excluded", delta_color="off")
+              "vehicles remaining", delta_color="off")
+    c3.metric("Additional sales required", target_block["incremental_promotional_sales_required"])
+    c4.metric("Eligible for the sale event", feasibility["max_safe_candidate_pool"],
+              f"{len(result['excluded_vehicles'])} protected/excluded", delta_color="off")
 
     with st.expander("How the target was calculated"):
         st.markdown(md(
@@ -153,11 +156,11 @@ def render_promotion_planner(workflow_context: WorkflowContext | None = None) ->
 
     # --- plans ----------------------------------------------------------------------------
 
-    st.subheader("Three plans")
+    st.subheader("Compare sale-event approaches")
     st.caption(
-        "All three share the baseline's seed, so the difference between a plan and doing "
-        "nothing is the price change rather than sampling noise. Unit sales are integers, so "
-        "the mean matters as much as the median for effects smaller than one car."
+        "Each approach makes a different trade-off between protecting profit and freeing space. "
+        "The recommended one is marked. A plan improves the odds of reaching the target — it "
+        "does not guarantee sales."
     )
 
     columns = st.columns(3)
@@ -168,34 +171,34 @@ def render_promotion_planner(workflow_context: WorkflowContext | None = None) ->
 
         with column.container(border=True):
             st.markdown(
-                f"**{plan_type.replace('_', ' ').title()}**"
+                f"**{T.plan_name(plan_type)}**"
                 + ("  ⭐ recommended" if is_recommended else "")
             )
-            st.metric("Vehicles promoted", item["totals"]["vehicle_count"])
+            st.caption(T.plan_trade_off(plan_type))
+            st.metric("Vehicles in the sale event", item["totals"]["vehicle_count"])
             st.metric("Dealer-funded discount", f"${item['totals']['total_dealer_funded']:,.0f}")
             st.metric(
-                "Incremental units",
+                "Expected additional sales",
                 f"{outcomes['incremental_units_sold']['mean']:.2f} avg",
-                f"P90 {outcomes['incremental_units_sold']['p90']:.0f}",
+                f"Conservative (P90) {outcomes['incremental_units_sold']['p90']:.0f}",
                 delta_color="off",
             )
             st.metric(
-                "Gross impact (P50)",
+                "Expected gross impact (P50)",
                 f"${outcomes['gross_impact']['p50']:,.0f}",
                 delta_color="off",
             )
-            st.metric("P(target achieved)", f"{outcomes['probability_target_achieved']:.0%}")
+            st.metric("Likelihood of reaching the target", f"{outcomes['probability_target_achieved']:.0%}")
             st.caption(
-                f"Ending utilization P50 {outcomes['ending_utilization']['p50']:.0%} · "
+                f"Expected lot capacity used (P50) {outcomes['ending_utilization']['p50']:.0%} · "
                 f"{'within budget' if item['totals']['within_budget'] else 'over budget'}"
             )
 
     if plans["MARGIN_PROTECT"]["totals"]["vehicle_count"] == 0:
         st.info(
-            "Margin Protect promotes nothing here. It respects the net-value optimum, and on "
-            "this lot discounting destroys more gross than it saves in carrying cost — so the "
-            "honest margin-protecting answer is *do not discount*. The other two plans show "
-            "what the capacity target costs.",
+            "**Prioritize profit protection** discounts nothing here. On this lot, discounting "
+            "would cost more gross than it saves in carrying cost — so the profit-protecting "
+            "answer is *do not discount*. The other two approaches show what the space target costs.",
             icon="💡",
         )
 
@@ -204,8 +207,8 @@ def render_promotion_planner(workflow_context: WorkflowContext | None = None) ->
         outcomes = plans[plan_type]["outcomes"]
         figure.add_trace(
             go.Bar(
-                name=plan_type.replace("_", " ").title(),
-                x=["Incremental units (mean)", "Gross impact ($100s)", "P(target) %"],
+                name=T.plan_name(plan_type),
+                x=["Additional sales (avg)", "Gross impact (hundreds of $)", "Target likelihood (%)"],
                 y=[
                     outcomes["incremental_units_sold"]["mean"],
                     outcomes["gross_impact"]["p50"] / 100.0,
@@ -219,8 +222,8 @@ def render_promotion_planner(workflow_context: WorkflowContext | None = None) ->
     # --- alternatives ---------------------------------------------------------------------
 
     if feasibility["alternatives"]:
-        st.subheader("If the target is not reachable")
-        st.caption("Quantified, because 'not achievable' on its own leaves you where you started.")
+        st.subheader("What would improve the odds")
+        st.caption("Concrete options, because a likelihood on its own leaves you where you started.")
         st.dataframe(
             pd.DataFrame(
                 [
@@ -228,21 +231,22 @@ def render_promotion_planner(workflow_context: WorkflowContext | None = None) ->
                         "Option": a["option"].replace("_", " ").title(),
                         "Change required": a["quantified_change"],
                         "Unit": a["unit"].title(),
-                        "Resulting P(target)": a["resulting_probability_target_achieved"] * 100.0,
+                        "New target likelihood": a["resulting_probability_target_achieved"] * 100.0,
                     }
                     for a in feasibility["alternatives"]
                 ]
             ),
             hide_index=True,
             column_config={
-                "Resulting P(target)": st.column_config.NumberColumn(format="%.0f%%"),
+                "New target likelihood": st.column_config.NumberColumn(format="%.0f%%"),
             },
         )
 
     # --- promote / protect / exclude ------------------------------------------------------
 
     st.subheader("Per-vehicle actions")
-    promote_tab, protect_tab, exclude_tab = st.tabs(["Promote", "Protect price", "Excluded"])
+    promote_tab, protect_tab, exclude_tab = st.tabs(
+        ["Include in sale event", "Protect price", "Protected or excluded"])
     actions = result["per_vehicle_actions"]
     chosen_plan = plans[recommended["plan_type"]]
     prices = {v["vehicle_id"]: v for v in chosen_plan["vehicles_selected"]}
@@ -261,10 +265,10 @@ def render_promotion_planner(workflow_context: WorkflowContext | None = None) ->
                 "Photo": _photo(a["vehicle_id"]),
                 "Stock": a["vehicle_id"],
                 "Vehicle": describe(fleet.get(a["vehicle_id"])),
-                "Current": prices[a["vehicle_id"]]["current_list_price"],
-                "Promotion price": a["promotion_price"],
+                "Current asking price": prices[a["vehicle_id"]]["current_list_price"],
+                "Sale-event price": a["promotion_price"],
                 "Discount": prices[a["vehicle_id"]]["discount"],
-                "Min safe list": prices[a["vehicle_id"]]["minimum_safe_list_price"],
+                "Lowest safe asking price": prices[a["vehicle_id"]]["minimum_safe_list_price"],
             }
             for a in actions
             if a["action"] == "PROMOTE"
@@ -276,11 +280,12 @@ def render_promotion_planner(workflow_context: WorkflowContext | None = None) ->
                     "Photo": PHOTO_COLUMN,
                     **{
                         c: st.column_config.NumberColumn(format="$%d")
-                        for c in ("Current", "Promotion price", "Discount", "Min safe list")
+                        for c in ("Current asking price", "Sale-event price", "Discount",
+                                  "Lowest safe asking price")
                     },
                 },
             )
-            st.caption("No promotion price falls below its minimum safe list price.")
+            st.caption("No sale-event price falls below its lowest safe asking price.")
         else:
             st.write("This plan promotes no vehicles.")
 
@@ -316,17 +321,19 @@ def render_promotion_planner(workflow_context: WorkflowContext | None = None) ->
                      column_config={"Photo": PHOTO_COLUMN})
         st.caption(
             "Every exclusion carries a reason — a plan is not reviewable if you cannot see "
-            "what was left out. `NO_SAFE_HEADROOM` means the vehicle is already at or below "
-            "its floor, which is common for aged and underwater units: the cars you most want "
-            "to move are often the ones you cannot legally discount."
+            "what was left out. \"No safe room for a discount\" means the vehicle is already at "
+            "or below its safe price, which is common for aged units: the vehicles you most "
+            "want to move are often the ones you cannot safely discount."
         )
 
     # --- warnings -------------------------------------------------------------------------
 
     if result["warnings"]:
-        st.subheader("Warnings")
+        st.subheader("What to review")
         for warning in result["warnings"]:
-            st.markdown(md(f"`{warning['severity']}` **{warning['code']}** — {warning['message']}"))
+            st.markdown(md(f"**{T.warning_label(warning['code'])}** — {warning['message']}"))
+        with st.expander("View technical reason codes"):
+            st.caption("Warning codes: " + ", ".join(f"`{w['code']}`" for w in result["warnings"]))
 
     with st.expander("Audit"):
         st.write(
@@ -342,3 +349,5 @@ def render_promotion_planner(workflow_context: WorkflowContext | None = None) ->
                 else " — no validated history, configured default used"
             )
         )
+
+    render_glossary()

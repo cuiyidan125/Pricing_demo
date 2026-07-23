@@ -13,35 +13,35 @@ from dataclasses import dataclass
 # --- reason-code → dealer label -------------------------------------------------------
 
 SELECTION_LABELS: dict[str, str] = {
-    "CURRENTLY_OVER_90_DAYS": "Already over 90 days in inventory",
-    "CURRENTLY_OVER_120_DAYS": "Over 120 days — long aged",
-    "P50_PROJECTED_OVER_90_DAYS": "Likely to pass 90 days (P50)",
-    "P90_PROJECTED_OVER_90_DAYS": "Could pass 90 days in a downside (P90)",
-    "CURRENT_PRICE_POOR_DEAL": "Priced above the local market",
-    "HIGH_DEPRECIATION_RISK": "High depreciation exposure",
-    "HIGH_HOLDING_COST": "High holding-cost exposure",
-    "DUPLICATE_INVENTORY": "Duplicate of another unit on the lot",
-    "CAPACITY_RELEASE_PRIORITY": "Priority to free a slot",
-    "HIGH_SAFE_PROMOTIONAL_HEADROOM": "Has safe discount room",
-    "INBOUND_REPLACEMENT_PRESSURE": "Inbound unit of the same type arriving",
-    "LOW_ENGAGEMENT_OR_CONVERSION": "Low shopper engagement",
+    "CURRENTLY_OVER_90_DAYS": "Already over 90 days on lot",
+    "CURRENTLY_OVER_120_DAYS": "Already over 120 days on lot",
+    "P50_PROJECTED_OVER_90_DAYS": "Expected to exceed 90 days before sale",
+    "P90_PROJECTED_OVER_90_DAYS": "Meaningful risk of exceeding 90 days before sale",
+    "CURRENT_PRICE_POOR_DEAL": "Current price is not competitive",
+    "HIGH_DEPRECIATION_RISK": "High risk of further value loss",
+    "HIGH_HOLDING_COST": "High cost of remaining in inventory",
+    "DUPLICATE_INVENTORY": "Similar vehicles are competing for the same demand",
+    "CAPACITY_RELEASE_PRIORITY": "High priority for freeing lot space",
+    "HIGH_SAFE_PROMOTIONAL_HEADROOM": "Room for a safer promotional adjustment",
+    "INBOUND_REPLACEMENT_PRESSURE": "Incoming inventory is increasing space pressure",
+    "LOW_ENGAGEMENT_OR_CONVERSION": "Low shopper engagement or conversion",
 }
 
 EXCLUSION_LABELS: dict[str, str] = {
-    "RECENTLY_ACQUIRED": "Recently acquired — protect price",
-    "ALREADY_GOOD_DEAL": "Already priced to sell",
-    "HIGH_DEMAND_PROTECT_GROSS": "High demand — protect gross",
+    "RECENTLY_ACQUIRED": "Recently acquired — protect the current strategy",
+    "ALREADY_GOOD_DEAL": "Already competitively priced",
+    "HIGH_DEMAND_PROTECT_GROSS": "Strong demand — protect profit",
     "EXPECTED_TO_SELL_BEFORE_EVENT": "Expected to sell before the event",
-    "INSUFFICIENT_DATA": "Not enough data to analyse",
-    "NO_SAFE_DISCOUNT_HEADROOM": "No safe discount room (at the price floor)",
-    "ALREADY_ASSIGNED_TO_CAMPAIGN": "Already assigned to another campaign",
-    "MANUAL_HOLD": "On manual hold",
+    "INSUFFICIENT_DATA": "Not enough reliable data to recommend an action",
+    "NO_SAFE_DISCOUNT_HEADROOM": "No safe room for an additional discount",
+    "ALREADY_ASSIGNED_TO_CAMPAIGN": "Already included in another campaign",
+    "MANUAL_HOLD": "Manually protected from automated recommendations",
 }
 
 # Consolidated action → dealer label.
 ACTION_LABELS: dict[str, str] = {
     "REPRICE_NOW": "Reprice now",
-    "EVENT_PROMOTION": "Include in the event promotion",
+    "EVENT_PROMOTION": "Include in sale event",
     "PROTECT_PRICE": "Protect price — no action",
     "MANAGER_REVIEW": "Manager review before repricing",
     "WHOLESALE_OR_LOSS_MINIMIZATION_REVIEW": "Wholesale / loss-minimization review",

@@ -171,9 +171,9 @@ def test_presentation_layer_does_no_calculation(name):
 
 
 def test_reason_codes_map_to_friendly_labels():
-    assert copy.selection_label("CURRENTLY_OVER_90_DAYS") == "Already over 90 days in inventory"
-    assert copy.exclusion_label("RECENTLY_ACQUIRED") == "Recently acquired — protect price"
-    assert copy.exclusion_label("ALREADY_ASSIGNED_TO_CAMPAIGN") == "Already assigned to another campaign"
+    assert copy.selection_label("CURRENTLY_OVER_90_DAYS") == "Already over 90 days on lot"
+    assert copy.exclusion_label("RECENTLY_ACQUIRED") == "Recently acquired — protect the current strategy"
+    assert copy.exclusion_label("ALREADY_ASSIGNED_TO_CAMPAIGN") == "Already included in another campaign"
     # Unknown codes degrade to a readable title, never a crash.
     assert copy.selection_label("SOME_NEW_CODE") == "Some New Code"
 
@@ -200,8 +200,8 @@ def test_default_summary_has_exactly_five_business_steps():
     assert len(view.BUSINESS_STEPS) == 5
     labels = [label for label, _, _ in view.BUSINESS_STEPS]
     assert labels == [
-        "Diagnose portfolio", "Select candidates", "Analyze selected vehicles",
-        "Build promotion plan", "Consolidate action plan",
+        "Review the lot", "Identify vehicles requiring action", "Evaluate pricing options",
+        "Build the sale-event plan", "Create the dealer action plan",
     ]
 
 
