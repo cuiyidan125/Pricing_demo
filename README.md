@@ -99,6 +99,10 @@ each, before linking into the full workspace. It is **multi-turn**: follow-ups e
 ("why is the BMW recommended for wholesale?"), filter the result ("show only vehicles over 90
 days"), or trigger a validated deterministic re-run ("use Summer Clearance", "set the target to
 70%") — with conversation history preserved and the previous result kept until a re-run succeeds.
+It also **switches workflows** when the ask changes: from an aging conversation, "what should I
+price the 2021 Honda Accord EX?" routes to Single Vehicle Valuation (the action verb decides, not
+the vehicle name), runs the existing valuation, and keeps the prior aging analysis in history —
+while "why does the Accord require manager review?" stays an aging follow-up.
 **No model is involved** — routing, entity extraction, reference resolution ("the BMW", "those
 two vehicles"), and the grounded answer are rules over strings (`src/pricing_agent/agents/`), and
 every number shown is copied from the skill result, never generated. Review requirements are

@@ -169,6 +169,14 @@ workspace"* carries the conversation's context across. If you ask for something 
 doesn't have — shopper views, lead conversion — it says so rather than inventing a number, and it
 never publishes a price.
 
+**And it knows when you've changed the subject.** Ask *"what should I price the 2021 Honda Accord
+EX?"* mid-conversation and it **switches to Single Vehicle Valuation** — a visible "Switching from
+Improve Aging Inventory to Single Vehicle Valuation" banner, then the normal valuation — because
+the *action* you asked for changed, not just the vehicle you named. The aging conversation stays
+in the thread above, so nothing is lost. By contrast *"why does the Accord require manager
+review?"* stays an aging follow-up: the vehicle name alone never triggers a switch, the business
+action does.
+
 **Open on the executive summary — read it out in ten seconds:**
 
 > "Eighty-six percent full, target seventy, two cars to release, seven candidates — and an

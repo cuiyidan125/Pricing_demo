@@ -18,6 +18,7 @@ from pricing_agent.agents.aging_answer import DirectAnswer, VehicleLine, build_a
 from pricing_agent.agents.conversation import (
     ConversationMessage,
     ConversationState,
+    PriorWorkflow,
     new_state,
     resolve_reference,
 )

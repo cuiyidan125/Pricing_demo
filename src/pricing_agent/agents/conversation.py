@@ -28,6 +28,7 @@ SOURCE_EXISTING = "existing_result"
 SOURCE_CLARIFICATION = "clarification"
 SOURCE_UNSUPPORTED = "unsupported"
 SOURCE_ERROR = "error"
+SOURCE_SWITCH = "workflow_switch"
 
 RICH_SOURCES = frozenset({SOURCE_FIRST_TURN, SOURCE_RERUN})
 
@@ -47,6 +48,18 @@ class ConversationMessage:
     response: object | None = None
     referenced_vehicle_ids: tuple[str, ...] = ()
     referenced_workflow_id: str | None = None
+    timestamp: str = field(default_factory=_now)
+
+
+@dataclass(frozen=True)
+class PriorWorkflow:
+    """A previously active workflow, preserved when the conversation switches to a new one so a
+    valid earlier result is never discarded."""
+    workflow_type: str | None
+    workflow_id: str | None
+    request_id: str | None
+    result: object | None
+    response: object | None
     timestamp: str = field(default_factory=_now)
 
 
@@ -72,6 +85,7 @@ class ConversationState:
     previous_valid_result: object | None = None
     rerun_count: int = 0
     last_referenced_vehicle_ids: tuple[str, ...] = ()
+    prior_workflows: list[PriorWorkflow] = field(default_factory=list)
 
     # --- history -------------------------------------------------------------------
 
@@ -112,6 +126,48 @@ class ConversationState:
         self.active_warnings = tuple(getattr(response, "warnings", ()) or ())
         self.active_approvals = tuple(result.approvals_required)
         self.active_simulation_ids = _simulation_ids(result)
+
+    def adopt_response(self, response) -> None:
+        """Adopt any AssistantResponse — the aging orchestration via `adopt`, or a single-skill
+        result (e.g. a valuation) via a generic read of its audit block. Copies ids and fields;
+        computes nothing."""
+        if getattr(response, "improve_aging", None) is not None:
+            self.adopt(response)
+            return
+        result = getattr(response, "result", None) or {}
+        audit = result.get("audit", {}) if isinstance(result, dict) else {}
+        self.active_response = response
+        self.active_result = result or None
+        workflow = getattr(response, "workflow", None)
+        self.active_workflow_type = workflow.name if workflow is not None else None
+        self.active_workflow_id = audit.get("workflow_id") or audit.get("request_id")
+        self.active_request_id = audit.get("request_id")
+        self.active_vehicle_ids = (
+            (response.resolved_vehicle_id,) if getattr(response, "resolved_vehicle_id", None) else ())
+        self.active_event = None
+        self.active_target_utilization = None
+        self.active_plan = None
+        self.active_warnings = tuple(getattr(response, "warnings", ()) or ())
+        self.active_approvals = tuple(result.get("approvals_required", []) if isinstance(result, dict) else [])
+        sim = (audit.get("simulation") or {}).get("simulation_id") if isinstance(audit, dict) else None
+        self.active_simulation_ids = (sim,) if sim else ()
+
+    def switch_to(self, response) -> None:
+        """Switch the active workflow to `response`, preserving the current one in history first.
+
+        The prior valid result is pushed to `prior_workflows` (never discarded); references that
+        only applied to the prior workflow are cleared; then the new response is adopted."""
+        if self.active_result is not None:
+            self.prior_workflows.append(PriorWorkflow(
+                workflow_type=self.active_workflow_type,
+                workflow_id=self.active_workflow_id,
+                request_id=self.active_request_id,
+                result=self.active_result,
+                response=self.active_response,
+            ))
+        self.last_referenced_vehicle_ids = ()
+        self.pending_clarification = None
+        self.adopt_response(response)
 
     @property
     def has_active_result(self) -> bool:
