@@ -65,11 +65,14 @@ def test_ambiguous_vehicle():
     assert {c["vehicle_id"] for c in response.candidates} == {"V-10001", "V-10007"}
 
 
-def test_improve_aging_is_deferred_transparently():
+def test_improve_aging_now_executes():
+    """Phase 5: the aging orchestration is connected. It runs the portfolio diagnosis and
+    single-vehicle analysis for selected candidates."""
     response = run("Which aging vehicles should I promote?")
-    assert response.state is AssistantState.WORKFLOW_NOT_YET_AVAILABLE
+    assert response.state is AssistantState.ROUTED_AND_EXECUTED
     assert response.workflow is WorkflowContext.IMPROVE_AGING_INVENTORY
-    assert "not connected" in response.message.lower() or "not yet" in response.message.lower()
+    assert response.summary["candidate_count"] > 0
+    assert response.improve_aging is not None
 
 
 def test_unclassifiable_request_needs_clarification():

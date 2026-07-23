@@ -300,13 +300,17 @@ the vocabulary in this section and the vocabulary on screen cannot drift apart.
 
 ### Implementation status
 
-Two capabilities in this section are specified but not yet built, and the interface says so
-on screen rather than implying otherwise:
+The workflow layer is built out across phases; the interface states plainly what is and is
+not connected.
 
-* **Natural-language routing from the assistant** (§7.1). The entry point captures a
-  question and states that routing is not connected. No model is called from it.
-* **Improve Aging orchestration.** The page describes its six-step sequence and which
-  capability serves each step. It runs none of them and produces no figures.
+* **Deterministic natural-language routing** (§7.1) is connected as of Phase 4 — the
+  assistant classifies a request, resolves the vehicle, and runs one skill, with **no model**
+  in the path. LLM-assisted routing will sit above this deterministic layer in a later phase.
+* **Improve Aging orchestration** is connected as of Phase 5. It coordinates all three skills
+  — portfolio forecast → candidate selection → single-vehicle valuation for the aged cohort →
+  promotion plan when a real event is named → one consolidated action plan — and adds no
+  arithmetic of its own. Figures from different simulations are shown side by side, never
+  summed. See `docs/improve-aging-orchestration-results.md`.
 
 ---
 

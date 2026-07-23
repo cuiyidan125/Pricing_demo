@@ -83,7 +83,8 @@ Three words that are easy to blur, kept distinct because the distinction is the 
 A workflow may use one skill or several; a skill may serve several workflows. **Improve
 Aging Inventory is a workflow, not a fourth skill** — it coordinates all three against aged
 units and adds no valuation, forecasting, or promotion arithmetic of its own. Making it a
-skill would have meant duplicating logic that already exists three times over.
+skill would have meant duplicating logic that already exists three times over. Its
+orchestration is implemented in Phase 5 (§3.6).
 
 Navigation is declared in `src/pricing_agent/workflows/registry.py` as frozen dataclasses,
 so what the product offers is one list rather than a set of filenames. The registry holds no
@@ -157,6 +158,42 @@ containment guarantee does not depend on the LLM being absent, but the determini
 happens not to use one at all. `test_assistant.py` makes a model call explode and asserts
 the pricing path still executes. When an LLM-based router is added later, it will sit
 *above* this layer — choosing a workflow, never producing a figure.
+
+### 3.6 Improve Aging orchestration (Phase 5)
+
+`src/pricing_agent/workflows/improve_aging.py` runs the three skills in dependency order and
+consolidates their results. It is the strongest test of the "orchestrate, don't compute"
+boundary, because it is where the temptation to combine figures is greatest.
+
+```
+1 PORTFOLIO_FORECAST        inventory_portfolio.analyze   sim_P    once
+2 CANDIDATE_SELECTION        candidate_selection            —       ranks/filters sim_P + facts
+3 SINGLE_VEHICLE_VALUATION   single_vehicle.analyze × k    sim_V1…k selected candidates only
+4 PROMOTION_PLAN             promotion_planner.plan_event  sim_M    only if a real event resolves
+5 CONSOLIDATE                improve_aging                  —       group actions, side-by-side figures
+```
+
+Three invariants, each tested:
+
+* **No recalculation.** `candidate_selection` and `improve_aging` import neither `domain` nor
+  `simulation`, and contain no `percentile`/`np.`/`simulate(` call. Selection reads the
+  portfolio's `top_risk_vehicles` and `recommended_actions` and static inventory facts;
+  consolidation reads whole skill-result objects.
+* **Simulations stay separate.** The portfolio, each single vehicle, and the promotion plan
+  are different probability spaces (`sim_P`, `sim_Vi`, `sim_M`). The engine never sums a
+  percentile across them. Portfolio-level joint figures — ending inventory, target
+  probability, joint gross/holding/depreciation impact — come from the recommended promotion
+  plan's simulation alone, and are marked unavailable when no event ran. Per-vehicle evidence
+  is shown side by side, each stamped with its own `request_id` and `simulation_id`.
+* **The workflow's protection is authoritative.** The promotion skill has its own eligibility
+  rules; if its raw plan selects a vehicle the workflow protected (recently acquired, high
+  demand), the workflow holds it back (`held_from_promotion`) rather than promoting it.
+
+Failure is a state, not a crash: if a single-vehicle or promotion call raises, completed
+results are preserved, the gap is named, and the workflow returns `PARTIAL_RESULT`. The six
+states are `ROUTED_AND_EXECUTED`, `NEEDS_CLARIFICATION`, `PARTIAL_RESULT`,
+`TARGET_NOT_ACHIEVABLE`, `NO_SAFE_ACTIONS`, `EXECUTION_ERROR`. An event named but not on the
+calendar ("July 4th") returns `NEEDS_CLARIFICATION` and is never substituted.
 
 ---
 
@@ -321,7 +358,8 @@ other fixtures permanently fresh.
 ```text
 src/
 ├── workflows/         registry (the four dealer workflows + the assistant), WorkflowContext,
-│                      pages (url_path → live st.Page, for client-side links)
+│                      pages (url_path → live st.Page), and the Improve Aging orchestration
+│                      (candidate_selection + improve_aging) — coordinates the three skills
 ├── views/             dashboard, vehicle_detail, promotion, assistant_home,
 │                      improve_aging, workflow_copy, page_config — render only
 ├── agents/            deterministic router + resolver + assistant orchestrator (Phase 4),

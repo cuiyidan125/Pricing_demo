@@ -62,12 +62,27 @@ def test_promotion_maps_to_the_promotion_skill():
     assert result.required_skill == "dealer-event-promotion-planner"
 
 
-def test_aging_is_routed_but_names_no_single_skill_and_is_not_executable():
+def test_aging_is_routed_names_no_single_skill_and_is_now_executable():
+    """Phase 5: Improve Aging is an orchestration over all three skills, so it names no
+    single required_skill, but it now executes (it can always diagnose the portfolio)."""
     result = route("which aging vehicles should I promote?")
     assert result.selected_workflow is WorkflowContext.IMPROVE_AGING_INVENTORY
     assert result.required_skill is None
-    assert result.execution_allowed is False
-    assert "ORCHESTRATION_NOT_AVAILABLE" in result.reason_codes
+    assert result.execution_allowed is True
+
+
+def test_inventory_pressure_routes_to_improve_aging_even_with_a_named_event():
+    """"reduce inventory utilization during Summer Clearance" is an aging-reduction job, not
+    a plain event plan — the inventory-pressure framing wins over the event."""
+    result = route("reduce my inventory utilization to 70% during the Summer Clearance event")
+    assert result.selected_workflow is WorkflowContext.IMPROVE_AGING_INVENTORY
+    assert "INVENTORY_PRESSURE_TERM" in result.reason_codes
+
+
+def test_plain_event_plan_still_routes_to_merchandise():
+    """A promotion request without inventory-reduction framing stays MERCHANDISE (Phase 4)."""
+    result = route("plan the Summer Clearance event to reach 70% utilization")
+    assert result.selected_workflow is WorkflowContext.MERCHANDISE_INVENTORY
 
 
 def test_aging_cohort_beats_promotion_when_both_words_appear():

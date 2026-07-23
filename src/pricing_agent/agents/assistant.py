@@ -32,6 +32,11 @@ from pricing_agent.mcp_clients import EventClient, MockTransport, VautoClient
 from pricing_agent.policy.warnings import sort_by_severity
 from pricing_agent.skills import inventory_portfolio, promotion_planner, single_vehicle
 from pricing_agent.workflows.context import WorkflowContext
+from pricing_agent.workflows.improve_aging import (
+    ImproveAgingRequest,
+    WorkflowState,
+    run_improve_aging,
+)
 
 
 class AssistantState(str, Enum):
@@ -41,6 +46,10 @@ class AssistantState(str, Enum):
     AMBIGUOUS_MATCH = "AMBIGUOUS_MATCH"
     WORKFLOW_NOT_YET_AVAILABLE = "WORKFLOW_NOT_YET_AVAILABLE"
     EXECUTION_ERROR = "EXECUTION_ERROR"
+    # Added in Phase 5 for the Improve Aging orchestration.
+    PARTIAL_RESULT = "PARTIAL_RESULT"
+    TARGET_NOT_ACHIEVABLE = "TARGET_NOT_ACHIEVABLE"
+    NO_SAFE_ACTIONS = "NO_SAFE_ACTIONS"
 
 
 # The workflow the dealer opens to see the full analysis behind a summary.
@@ -66,6 +75,9 @@ class AssistantResponse:
     warnings: tuple[dict, ...] = ()
     result: dict | None = None
     target_url: str | None = None
+    # The full ImproveAgingResult when the aging orchestration ran (Phase 5). Kept as a
+    # plain object so this module does not import the workflow types at annotation time.
+    improve_aging: object | None = None
 
     @property
     def executed(self) -> bool:
@@ -75,6 +87,23 @@ class AssistantResponse:
 # --- event resolution for the promotion workflow --------------------------------------
 
 _PERCENT = re.compile(r"(\d{1,3})\s*(?:%|percent)")
+
+# Did the request reference an event at all? Used to tell "no event, just diagnose" from
+# "named an event I could not resolve" (which must clarify, never substitute).
+_EVENT_REFERENCE = re.compile(
+    r"\b(event|promotion|promo|campaign|clearance|sale|july\s*4|fourth\s*of\s*july|"
+    r"independence|labor\s*day|memorial\s*day|black\s*friday|president'?s?\s*day|holiday)\b",
+    re.IGNORECASE,
+)
+
+
+def parse_explicit_target(text: str) -> float | None:
+    """A stated utilization target, or None when none was given (no silent default)."""
+    if match := _PERCENT.search(text):
+        value = int(match.group(1))
+        if 0 < value <= 100:
+            return value / 100.0
+    return None
 
 # Holiday phrases that identify an event by its date, with a representative (month, day).
 # A holiday matches an event only when that date falls inside the event's window — so
@@ -206,20 +235,6 @@ def run_assistant(text: str, *, as_of: datetime) -> AssistantResponse:
             route=routed,
         )
 
-    if workflow is WorkflowContext.IMPROVE_AGING_INVENTORY:
-        return AssistantResponse(
-            state=AssistantState.WORKFLOW_NOT_YET_AVAILABLE,
-            message=(
-                "Improving aging inventory coordinates all three skills — forecast, "
-                "single-vehicle pricing, and promotion planning — and that orchestration is "
-                "not connected yet. In the meantime, open Improve Aging Inventory to see "
-                "the sequence, or ask me to price one aged vehicle."
-            ),
-            route=routed,
-            workflow=workflow,
-            target_url=WORKFLOW_URL[workflow],
-        )
-
     try:
         if workflow is WorkflowContext.PRICE_INVENTORY:
             return _run_pricing(text, routed, as_of=as_of)
@@ -227,6 +242,8 @@ def run_assistant(text: str, *, as_of: datetime) -> AssistantResponse:
             return _run_portfolio(routed, as_of=as_of)
         if workflow is WorkflowContext.MERCHANDISE_INVENTORY:
             return _run_promotion(text, routed, as_of=as_of)
+        if workflow is WorkflowContext.IMPROVE_AGING_INVENTORY:
+            return _run_improve_aging(text, routed, as_of=as_of)
     except Exception as error:  # noqa: BLE001 — surfaced as a state, never swallowed
         return AssistantResponse(
             state=AssistantState.EXECUTION_ERROR,
@@ -381,3 +398,93 @@ def _run_promotion(text: str, routed: RouteResult, *, as_of: datetime) -> Assist
         result=result,
         target_url=url,
     )
+
+
+# --- Improve Aging orchestration ------------------------------------------------------
+
+_WORKFLOW_STATE_TO_ASSISTANT = {
+    WorkflowState.ROUTED_AND_EXECUTED: AssistantState.ROUTED_AND_EXECUTED,
+    WorkflowState.NEEDS_CLARIFICATION: AssistantState.NEEDS_CLARIFICATION,
+    WorkflowState.PARTIAL_RESULT: AssistantState.PARTIAL_RESULT,
+    WorkflowState.TARGET_NOT_ACHIEVABLE: AssistantState.TARGET_NOT_ACHIEVABLE,
+    WorkflowState.NO_SAFE_ACTIONS: AssistantState.NO_SAFE_ACTIONS,
+    WorkflowState.EXECUTION_ERROR: AssistantState.EXECUTION_ERROR,
+}
+
+
+def build_improve_aging_request(text: str, *, as_of: datetime) -> ImproveAgingRequest:
+    """Extract the structured request the orchestration needs. All text parsing lives here,
+    in the agent layer, so the workflow itself never touches free text."""
+    transport = MockTransport(as_of=as_of)
+    events = EventClient(transport).get_sales_event_calendar().data
+    event_requested = bool(_EVENT_REFERENCE.search(text))
+    event = resolve_event(text, events) if event_requested else None
+    return ImproveAgingRequest(
+        target_utilization=parse_explicit_target(text),
+        event_requested=event_requested,
+        event_id=event["event_id"] if event else None,
+        event_name=event["event_name"] if event else None,
+        available_events=tuple(e["event_name"] for e in events),
+    )
+
+
+def _run_improve_aging(text: str, routed: RouteResult, *, as_of: datetime) -> AssistantResponse:
+    transport = MockTransport(as_of=as_of)
+    request = build_improve_aging_request(text, as_of=as_of)
+    result = run_improve_aging(transport, request)
+
+    summary = _improve_aging_summary(result)
+    warnings = _improve_aging_top_warnings(result)
+    return AssistantResponse(
+        state=_WORKFLOW_STATE_TO_ASSISTANT[result.state],
+        message=result.message,
+        route=routed,
+        workflow=WorkflowContext.IMPROVE_AGING_INVENTORY,
+        skill=None,
+        summary=summary,
+        warnings=warnings,
+        improve_aging=result,
+        target_url=WORKFLOW_URL[WorkflowContext.IMPROVE_AGING_INVENTORY],
+    )
+
+
+def _improve_aging_summary(result) -> dict:
+    diag = result.portfolio_summary or {}
+    selection = result.selection
+    promotion = result.promotion_result
+    action_counts: dict[str, int] = {}
+    for a in result.consolidated_actions:
+        action_counts[a["recommended_action"]] = action_counts.get(a["recommended_action"], 0) + 1
+    return {
+        "workflow": "Improve Aging Inventory",
+        "current_inventory": diag.get("current_inventory"),
+        "current_utilization": diag.get("current_utilization"),
+        "target_utilization": diag.get("target_utilization"),
+        "aged_concentration_pct": diag.get("aged_concentration_pct"),
+        "units_below_break_even": diag.get("units_below_break_even"),
+        "candidate_count": len(selection.candidates) if selection else 0,
+        "deep_analysed_count": len(result.vehicle_evidence),
+        "excluded_count": len(selection.exclusions) if selection else 0,
+        "required_unit_reduction": diag.get("required_unit_reduction"),
+        "recommended_plan": promotion["recommended_plan"]["plan_type"] if promotion else None,
+        "target_status": (promotion["feasibility"]["status"] if promotion else "NO_EVENT"),
+        "probability_target_achieved": diag.get("probability_target_achieved"),
+        "approvals_required": len(result.approvals_required),
+        "action_counts": action_counts,
+        "execution_order": list(result.execution_order),
+    }
+
+
+def _improve_aging_top_warnings(result, limit: int = 4) -> tuple[dict, ...]:
+    seen: dict[str, dict] = {}
+    sources = list(result.vehicle_evidence)
+    for ev in sources:
+        for w in ev.warnings:
+            seen.setdefault(w["code"], w)
+    if result.promotion_result:
+        for w in result.promotion_result.get("warnings", []):
+            seen.setdefault(w["code"], w)
+    if result.portfolio_result:
+        for w in result.portfolio_result.get("warnings", []):
+            seen.setdefault(w["code"], w)
+    return tuple(sort_by_severity(list(seen.values()))[:limit])

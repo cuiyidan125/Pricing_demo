@@ -8,6 +8,7 @@ from pricing_agent.agents import narration_guard
 from pricing_agent.agents.assistant import (
     AssistantResponse,
     AssistantState,
+    build_improve_aging_request,
     run_assistant,
 )
 from pricing_agent.agents.extract import INTENTS, extract, intent_of
@@ -22,6 +23,7 @@ __all__ = [
     "MatchStatus",
     "ParsedVehicle",
     "RouteResult",
+    "build_improve_aging_request",
     "extract",
     "intent_of",
     "narration_guard",

@@ -112,6 +112,16 @@ NAMED_EVENTS = re.compile(
     r"holiday|president'?s?\s*day)\b"
 )
 
+# Inventory-reduction pressure. Distinct from "plan an event": these frame the request as
+# getting aged units *off* a too-full lot, which is the Improve Aging orchestration — even
+# when an event is named as the vehicle for doing it.
+INVENTORY_PRESSURE = re.compile(
+    r"\b(lot is full|lot'?s full|too many|overstock\w*|over[\s-]?capacit\w+|"
+    r"reduce (my |the )?inventory|reduce (my |the )?(inventory )?utilization|"
+    r"bring (my |the )?(inventory|utilization) down|cut (my |the )?inventory|"
+    r"reprice or promote|which vehicles should i (reprice|promote|move))\b"
+)
+
 FORECAST_HORIZON = re.compile(r"\bnext\s+\d+\s+(day|days|week|weeks|month|months)\b")
 PORTFOLIO_TERMS = re.compile(
     r"\b(inventory look|look like|forecast|capacity|open slots?|portfolio|acquire|"
@@ -290,8 +300,12 @@ def classify_intent(
 
     aging = bool(AGING_COHORT.search(lowered))
     cohort = bool(COHORT_PLURALITY.search(lowered))
-    if aging and cohort:
-        reasons.append("AGING_COHORT_TERM")
+    pressure = bool(INVENTORY_PRESSURE.search(lowered))
+    if (aging and cohort) or pressure:
+        if aging and cohort:
+            reasons.append("AGING_COHORT_TERM")
+        if pressure:
+            reasons.append("INVENTORY_PRESSURE_TERM")
         return WorkflowContext.IMPROVE_AGING_INVENTORY, Confidence.HIGH, tuple(reasons)
 
     promotion = bool(PROMOTION_TERMS.search(lowered))
@@ -368,16 +382,18 @@ def route(text: str) -> RouteResult:
         )
 
     if workflow is WorkflowContext.IMPROVE_AGING_INVENTORY:
-        # Routed correctly, deliberately not executed in this phase.
+        # Orchestration over all three skills; no single required_skill. The workflow can
+        # always at least diagnose the portfolio, so execution is allowed and the assistant
+        # extracts the target/event inputs.
         return RouteResult(
             selected_workflow=workflow,
             required_skill=None,
             confidence=confidence,
-            reason_codes=reasons + ("ORCHESTRATION_NOT_AVAILABLE",),
+            reason_codes=reasons,
             extracted_entities={},
             missing_fields=(),
             ambiguous_fields=(),
-            execution_allowed=False,
+            execution_allowed=True,
             parsed_vehicle=None,
         )
 

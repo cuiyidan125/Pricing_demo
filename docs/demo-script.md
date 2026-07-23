@@ -1,6 +1,6 @@
 # Demo Script
 
-Six beats, about five minutes. Written for a used-vehicle manager or general manager —
+Seven beats, about six minutes. Written for a used-vehicle manager or general manager —
 lead with dollars and days, not architecture.
 
 **Before you start:** `streamlit run app.py`, open http://localhost:8501, and click
@@ -133,6 +133,36 @@ Drag the target to **85%** to show the verdict change.
 
 ---
 
+## Beat 4.5 — Let the assistant coordinate all three (75s)
+
+Back to **Ask the Dealer AI Assistant**. Type **"Reduce my inventory utilization to 70%
+during the Summer Clearance event."** and **Analyze**, then open the **Improve Aging
+Inventory** workspace.
+
+> "This is one question that needed three skills. The assistant diagnosed the lot, picked
+> the aging cars worth acting on, priced each one, and built the event plan — in that order,
+> and it shows the order."
+
+Walk the workspace top to bottom:
+
+- **Candidate ranking** — seven aging cars selected, each with *why*: over 90 days, high
+  depreciation, duplicate inventory. Five excluded, each with *why not* — and two are
+  **protected**: recently acquired, held back from any discount even though the promotion
+  skill would have been willing to promote them.
+- **Per-vehicle evidence** — "Every row is a separate simulation. Look at the `sim_id`
+  column: they're all different. The workflow shows them side by side. It never adds a P50
+  from one simulation to a P50 from another — that would be inventing a number."
+- **Execution trace** — "Every step, every skill, every request and simulation id, in order.
+  If someone asks *how did it decide*, this is the answer."
+
+> "It's still honest about the target — seventy percent isn't reachable safely, and it says
+> so. But now it's coordinated the whole response, not just answered one question."
+
+**This is the beat that shows the architecture.** Improve Aging isn't a fourth skill — it's
+the three you already saw, run in order and consolidated.
+
+---
+
 ## Beat 5 — Show the receipts (30s)
 
 Back to **Price Inventory** → **Assumptions and audit trail**.
@@ -164,10 +194,11 @@ Price elasticity. It alone decides every velocity-versus-gross tradeoff and it i
 calibrated. It's one file, and it's labelled.
 
 **"What does Improve Aging Inventory do?"**
-Nothing yet, and the page says so. It is the fourth workflow and the reason the
-architecture is built this way: it coordinates all three skills against aged units rather
-than being a fourth skill. Today it shows the six-step sequence and which capability
-serves each step. Say that plainly — the page will contradict you otherwise.
+It coordinates all three skills against the aged cohort — forecast, then per-vehicle
+pricing, then an event plan — and consolidates them into one action list with an execution
+trace. It is a *workflow over the three skills*, not a fourth skill: it adds no arithmetic,
+and it keeps each skill's simulation separate rather than blending percentiles. Beat 4.5
+walks it.
 
 **"Is the assistant using ChatGPT / an LLM?"**
 No. Phase 4 routing is deterministic — keyword rules for intent, pattern matching for the
