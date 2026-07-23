@@ -24,8 +24,18 @@ from typing import Iterable, NamedTuple
 
 import streamlit as st
 
-from pricing_agent.agents import build_aging_answer, run_assistant
+from pricing_agent.agents import build_aging_answer, handle_followup, new_state, run_assistant
 from pricing_agent.agents.assistant import AssistantResponse, AssistantState
+from pricing_agent.agents.conversation import (
+    RICH_SOURCES,
+    SOURCE_CLARIFICATION,
+    SOURCE_ERROR,
+    SOURCE_EXPLANATION,
+    SOURCE_FILTERED,
+    SOURCE_FIRST_TURN,
+    SOURCE_RERUN,
+    SOURCE_UNSUPPORTED,
+)
 from pricing_agent.views import terminology as T
 from pricing_agent.workflows.context import WorkflowContext
 from pricing_agent.workflows.pages import page_for
@@ -38,6 +48,20 @@ AS_OF = datetime(2026, 7, 29, 14, 0, tzinfo=timezone.utc)
 QUESTION_KEY = "assistant_question"
 RESPONSE_KEY = "assistant_response"
 SELECTED_VEHICLE_KEY = "assistant_selected_vehicle_id"
+CONVERSATION_KEY = "assistant_conversation"
+PENDING_FOLLOWUP_KEY = "assistant_pending_followup"
+
+# Provenance shown above each non-rich assistant turn, so the dealer always knows whether an
+# answer came from the existing result, a filter, a clarification, an unavailable capability,
+# or a preserved-previous error.
+_PROVENANCE = {
+    SOURCE_EXPLANATION: "🔎 From your current analysis",
+    SOURCE_FILTERED: "🔎 Filtered from your current analysis",
+    SOURCE_CLARIFICATION: "❓ Needs a bit more information",
+    SOURCE_UNSUPPORTED: "🚫 Not available in this prototype",
+    SOURCE_ERROR: "⚠️ Kept your previous analysis",
+    SOURCE_RERUN: "🔄 Re-ran the analysis",
+}
 
 # Read by the Price Inventory view to preselect the routed vehicle.
 SESSION_KEY = QUESTION_KEY  # kept for backward compatibility with earlier phases
@@ -115,35 +139,45 @@ def render_assistant_home(
         height=110,
     )
 
+    conversation = st.session_state.get(CONVERSATION_KEY)
+    in_conversation = conversation is not None and conversation.has_active_result
+
     left, right = st.columns([1, 4])
     submitted = left.button("Get recommendation", type="primary")
-    right.caption("Suggested questions — copy one into the box above.")
+    right.caption("Ask a new question here; follow up in the chat box below.")
 
-    for prompt in SUGGESTED_PROMPTS:
-        st.markdown(f"- _{prompt}_")
+    # The starter prompts are only useful before a conversation exists; once one does, the
+    # relevant follow-ups are shown beneath the thread instead.
+    if not in_conversation:
+        for prompt in SUGGESTED_PROMPTS:
+            st.markdown(f"- _{prompt}_")
 
     if submitted:
         if request.strip():
-            st.session_state[QUESTION_KEY] = request
-            response = run_assistant(request, as_of=AS_OF)
-            st.session_state[RESPONSE_KEY] = response
-            # Seed the Price Inventory preselect once, at submit time — not during render —
-            # so it does not depend on the result being re-rendered before navigation.
-            if response.resolved_vehicle_id:
-                st.session_state[SELECTED_VEHICLE_KEY] = response.resolved_vehicle_id
-            # Hand the aging orchestration result to its workspace so the page reflects the
-            # question actually asked, not just the canned demo scenario. Cleared on any
-            # non-aging query so a later visit to the workspace does not show a stale result.
-            if response.improve_aging is not None:
-                st.session_state["improve_aging_result"] = response.improve_aging
-            else:
-                st.session_state.pop("improve_aging_result", None)
+            _start_conversation(request)
         else:
-            st.session_state.pop(RESPONSE_KEY, None)
             st.warning("Type a question first, or pick a workflow below.", icon="✍️")
 
+    # A clicked follow-up suggestion queued on the previous run.
+    pending = st.session_state.pop(PENDING_FOLLOWUP_KEY, None)
+    conversation = st.session_state.get(CONVERSATION_KEY)
+    if pending and conversation is not None and conversation.has_active_result:
+        handle_followup(pending, conversation, as_of=AS_OF)
+        _sync_workspace(conversation)
+
+    conversation = st.session_state.get(CONVERSATION_KEY)
     response: AssistantResponse | None = st.session_state.get(RESPONSE_KEY)
-    if response is not None:
+
+    if conversation is not None and conversation.active_workflow_type == "IMPROVE_AGING_INVENTORY":
+        st.divider()
+        _render_conversation(conversation)
+        _render_followup_suggestions(conversation)
+        follow = st.chat_input("Ask a follow-up about this analysis…")
+        if follow and follow.strip():
+            handle_followup(follow, conversation, as_of=AS_OF)
+            _sync_workspace(conversation)
+            st.rerun()
+    elif response is not None:
         st.divider()
         _render_response(response)
 
@@ -155,6 +189,78 @@ def render_assistant_home(
         "trained prediction, and no price can be published from this application.",
         icon="ℹ️",
     )
+
+
+# --- conversation ---------------------------------------------------------------------
+
+
+def _start_conversation(request: str) -> None:
+    """Run the first turn and, for an aging request, open a fresh conversation around it."""
+    st.session_state[QUESTION_KEY] = request
+    response = run_assistant(request, as_of=AS_OF)
+    st.session_state[RESPONSE_KEY] = response
+    if response.resolved_vehicle_id:
+        st.session_state[SELECTED_VEHICLE_KEY] = response.resolved_vehicle_id
+
+    if response.improve_aging is not None:
+        conversation = new_state()
+        conversation.add_user(request)
+        conversation.add_assistant(response.message, SOURCE_FIRST_TURN,
+                                   result=response.improve_aging, response=response)
+        conversation.adopt(response)
+        st.session_state[CONVERSATION_KEY] = conversation
+        _sync_workspace(conversation)
+    else:
+        # A non-aging question ends any prior conversation and uses the single-turn path.
+        st.session_state.pop(CONVERSATION_KEY, None)
+        st.session_state.pop("improve_aging_result", None)
+
+
+def _sync_workspace(conversation) -> None:
+    """Keep the workspace pointed at the conversation's active result, so opening the Improve
+    Aging page (and returning) preserves the current event, target, and referenced vehicles."""
+    if conversation.active_result is not None:
+        st.session_state["improve_aging_result"] = conversation.active_result
+
+
+def _render_conversation(conversation) -> None:
+    """The full turn-by-turn thread. Prior turns are never erased; the first turn renders the
+    Slice-1 rich answer, later turns render their grounded text with a provenance chip."""
+    for message in conversation.messages:
+        with st.chat_message(message.role):
+            if message.role == "user":
+                st.markdown(md(message.text))
+            elif message.source == SOURCE_FIRST_TURN and message.response is not None:
+                _render_improve_aging_result(message.response, show_followups=False)
+            else:
+                caption = _PROVENANCE.get(message.source)
+                if caption:
+                    st.caption(caption)
+                st.markdown(md(message.text))
+                if message.source == SOURCE_RERUN and message.response is not None \
+                        and message.response.target_url:
+                    _open_workflow_link(message.response.target_url,
+                                        "Open the updated workspace →")
+
+
+def _render_followup_suggestions(conversation) -> None:
+    """Clickable, result-relevant follow-ups. Clicking queues the question as a follow-up on the
+    next run; the workspace suggestion is handled by the page link, not a rerun."""
+    answer = build_aging_answer(conversation.active_result,
+                                workspace_url=conversation.active_response.target_url
+                                if conversation.active_response else None)
+    if answer is None or not answer.suggested_followups:
+        return
+    st.caption("Try a follow-up:")
+    columns = st.columns(3)
+    slot = 0
+    for index, question in enumerate(answer.suggested_followups):
+        if question.lower().startswith("open"):
+            continue  # the workspace link is rendered inside the turn, not as a follow-up
+        if columns[slot % 3].button(question, key=f"followup_{index}"):
+            st.session_state[PENDING_FOLLOWUP_KEY] = question
+            st.rerun()
+        slot += 1
 
 
 # --- the six states -------------------------------------------------------------------
@@ -197,10 +303,13 @@ def _render_executed(response: AssistantResponse) -> None:
         _render_improve_aging_result(response)
 
 
-def _render_improve_aging_result(response: AssistantResponse) -> None:
+def _render_improve_aging_result(response: AssistantResponse, *, show_followups: bool = True) -> None:
     """The direct, grounded answer — the actual vehicles and their recommended actions, in the
     conversation. The full evidence, plan comparison, and audit live on the workspace, linked
-    at the end. Every value is read from the structured result; nothing is computed here."""
+    at the end. Every value is read from the structured result; nothing is computed here.
+
+    `show_followups` is False inside a conversation thread, where one clickable suggestion block
+    is rendered once beneath the whole thread instead of after every turn."""
     s = response.summary
     icon = "✅" if response.state is AssistantState.ROUTED_AND_EXECUTED else "🚫"
     st.markdown(f"{icon} **Improve Aging Inventory** — {md(response.message)}")
@@ -263,7 +372,7 @@ def _render_improve_aging_result(response: AssistantResponse) -> None:
 
     _render_approval_details(answer)
 
-    if answer.suggested_followups:
+    if show_followups and answer.suggested_followups:
         st.markdown("**You could ask next:**")
         for q in answer.suggested_followups:
             st.markdown(f"- _{md(q)}_")

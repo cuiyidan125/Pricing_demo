@@ -448,6 +448,26 @@ def _run_improve_aging(text: str, routed: RouteResult, *, as_of: datetime) -> As
     )
 
 
+def wrap_improve_aging(result, routed, *, message: str | None = None) -> AssistantResponse:
+    """Wrap an already-computed ImproveAgingResult in an AssistantResponse.
+
+    Used by the follow-up layer to re-run the deterministic workflow with a modified request and
+    present the outcome through the same Slice-1 summary/warnings/url machinery. It executes no
+    skill and computes no number — it only re-packages a finished result."""
+    state = _WORKFLOW_STATE_TO_ASSISTANT.get(result.state, AssistantState.EXECUTION_ERROR)
+    return AssistantResponse(
+        state=state,
+        message=message or result.message,
+        route=routed,
+        workflow=WorkflowContext.IMPROVE_AGING_INVENTORY,
+        skill=None,
+        summary=_improve_aging_summary(result),
+        warnings=_improve_aging_top_warnings(result),
+        improve_aging=result,
+        target_url=WORKFLOW_URL[WorkflowContext.IMPROVE_AGING_INVENTORY],
+    )
+
+
 def _improve_aging_summary(result) -> dict:
     diag = result.portfolio_summary or {}
     selection = result.selection
