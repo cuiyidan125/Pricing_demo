@@ -15,6 +15,18 @@ top-level navigation entry.
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+# The package lives under `src/` (a src layout). Local runs put it on the path via
+# `pip install -e .` or pytest's `pythonpath`; Streamlit Community Cloud does neither — it
+# launches this file from the repo root and installs only requirements.txt. So resolve the
+# repo-relative `src` directory and add it to sys.path before importing the package. Uses
+# the file's own location, so it is independent of the working directory and the host.
+_SRC_PATH = Path(__file__).resolve().parent / "src"
+if _SRC_PATH.is_dir() and str(_SRC_PATH) not in sys.path:
+    sys.path.insert(0, str(_SRC_PATH))
+
 import streamlit as st
 
 from pricing_agent.views import APP_TITLE, configure_page
