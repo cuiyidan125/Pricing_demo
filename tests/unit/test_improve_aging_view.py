@@ -1,0 +1,242 @@
+"""Improve Aging workspace presentation. Phase 5.1.
+
+The polish is presentation-only, so these tests hold two lines at once: the new copy and
+layout are grounded in the workflow result (labels, next-steps, exec metrics all trace to a
+field), and **nothing the workflow decided has changed** — same selected and excluded
+vehicles, same recommended plan, same numbers — because the view computes nothing.
+"""
+
+from __future__ import annotations
+
+import ast
+from datetime import datetime, timezone
+from pathlib import Path
+
+import pytest
+
+from pricing_agent.agents import run_assistant
+from pricing_agent.agents.assistant import AssistantState
+from pricing_agent.mcp_clients import MockTransport
+from pricing_agent.views import improve_aging as view
+from pricing_agent.views import improve_aging_copy as copy
+from pricing_agent.workflows.improve_aging import (
+    ImproveAgingRequest,
+    WorkflowState,
+    run_improve_aging,
+)
+
+VIEWS = Path(__file__).resolve().parents[2] / "src" / "pricing_agent" / "views"
+AS_OF = datetime(2026, 7, 21, 14, 0, tzinfo=timezone.utc)
+
+SUMMER = ImproveAgingRequest(
+    target_utilization=0.70, event_requested=True, event_id="EVT-SUMMER-2026",
+    event_name="Summer Clearance", available_events=("Summer Clearance", "Labor Day Sales Event"))
+
+# The Phase 5 baseline this polish must not disturb.
+BASELINE_SELECTED = ["V-10005", "V-10012", "V-10002", "V-10006", "V-10004", "V-10008", "V-10001"]
+BASELINE_EXCLUDED = ["V-10003", "V-10007", "V-10009", "V-10010", "V-10011"]
+BASELINE_PLAN = "CAPACITY_FIRST"
+
+
+@pytest.fixture(scope="module")
+def result():
+    return run_improve_aging(MockTransport(as_of=AS_OF), SUMMER)
+
+
+@pytest.fixture(scope="module")
+def no_event():
+    return run_improve_aging(MockTransport(as_of=AS_OF), ImproveAgingRequest(target_utilization=0.70))
+
+
+# --- 1. executive-summary values come from the result --------------------------------
+
+
+def test_executive_metrics_come_straight_from_the_result(result):
+    m = view.executive_metrics(result)
+    d = result.portfolio_summary
+    assert m["current_utilization"] == d["current_utilization"]
+    assert m["target_utilization"] == d["target_utilization"]
+    assert m["required_unit_reduction"] == d["required_unit_reduction"]
+    assert m["candidate_count"] == len(result.selection.candidates)
+    assert m["target_status"] == result.promotion_result["feasibility"]["status"]
+    assert m["probability_target_achieved"] == d["probability_target_achieved"]
+
+
+# --- 2. TARGET_NOT_ACHIEVABLE copy reflects the actual gap ----------------------------
+
+
+def test_target_not_achievable_recommendation_and_gap(result):
+    assert result.state is WorkflowState.TARGET_NOT_ACHIEVABLE
+    statement = copy.recommendation_statement(result)
+    assert "not achievable" in statement.lower()
+    # The gap the view shows is required minus what the safe plan can release, from the result.
+    required = result.portfolio_summary["required_unit_reduction"]
+    achievable = result.promotion_result["feasibility"]["p50_achievable_incremental_units"]
+    assert required == 4 and achievable == 0.0        # from the fixture, unchanged
+    assert (required - achievable) == 4               # the gap the copy narrates
+
+
+def test_gap_reasons_are_only_those_the_result_supports(result):
+    reasons = view._gap_reasons(result)
+    joined = " ".join(reasons).lower()
+    # Present in this result:
+    assert "recently-acquired" in joined            # V-10007, V-10010
+    assert "campaign" in joined                     # V-10011
+    assert "price floor" in joined                  # below-break-even approvals
+    # Absent reasons must not be invented — there is no low-engagement signal in this result.
+    assert "engagement" not in joined
+
+
+# --- 3. actions map only from existing result fields ---------------------------------
+
+
+def test_next_steps_are_grounded_and_counted(result):
+    steps = copy.next_steps(result)
+    assert 3 <= len(steps) <= 5
+    counts: dict[str, int] = {}
+    for a in result.consolidated_actions:
+        counts[a["recommended_action"]] = counts.get(a["recommended_action"], 0) + 1
+    titles = " ".join(s.title for s in steps)
+    assert str(counts.get("MANAGER_REVIEW", 0)) in titles
+    assert str(counts.get("WHOLESALE_OR_LOSS_MINIMIZATION_REVIEW", 0)) in titles
+    for step in steps:
+        assert step.grounded_in         # every action names its source
+
+
+def test_next_steps_omit_plan_action_when_no_event(no_event):
+    steps = copy.next_steps(no_event)
+    joined = " ".join(s.title.lower() for s in steps)
+    assert "approve the" not in joined      # no promotion plan exists without an event
+
+
+# --- 4 & 5. selected / excluded vehicles unchanged -----------------------------------
+
+
+def test_selected_vehicle_ids_unchanged(result):
+    assert list(result.selection.candidate_ids) == BASELINE_SELECTED
+
+
+def test_excluded_vehicle_ids_unchanged(result):
+    assert [e.vehicle_id for e in result.selection.exclusions] == BASELINE_EXCLUDED
+
+
+# --- 6. recommended plan unchanged ---------------------------------------------------
+
+
+def test_recommended_plan_unchanged(result):
+    assert result.promotion_result["recommended_plan"]["plan_type"] == BASELINE_PLAN
+
+
+# --- 7. the view and copy layers do no calculation -----------------------------------
+
+
+@pytest.mark.parametrize("name", ["improve_aging.py", "improve_aging_copy.py"])
+def test_presentation_layer_does_no_calculation(name):
+    tree = ast.parse((VIEWS / name).read_text(encoding="utf-8"))
+    imported = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imported += [a.name for a in node.names]
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            imported.append(node.module)
+    for mod in imported:
+        assert not mod.startswith(("pricing_agent.domain", "pricing_agent.simulation")), \
+            f"{name} imports the calculation layer: {mod}"
+    source = (VIEWS / name).read_text(encoding="utf-8")
+    for banned in ("np.percentile", ".percentile(", "np.mean", "simulate("):
+        assert banned not in source, f"{name} references {banned}"
+
+
+# --- 8. raw reason codes map to dealer-friendly labels -------------------------------
+
+
+def test_reason_codes_map_to_friendly_labels():
+    assert copy.selection_label("CURRENTLY_OVER_90_DAYS") == "Already over 90 days in inventory"
+    assert copy.exclusion_label("RECENTLY_ACQUIRED") == "Recently acquired — protect price"
+    assert copy.exclusion_label("ALREADY_ASSIGNED_TO_CAMPAIGN") == "Already assigned to another campaign"
+    # Unknown codes degrade to a readable title, never a crash.
+    assert copy.selection_label("SOME_NEW_CODE") == "Some New Code"
+
+
+def test_exclusion_categories_are_classified():
+    assert copy.exclusion_category(("INSUFFICIENT_DATA",)) == copy.DATA_LIMITATION
+    assert copy.exclusion_category(("NO_SAFE_DISCOUNT_HEADROOM",)) == copy.SAFETY_RULE
+    assert copy.exclusion_category(("RECENTLY_ACQUIRED",)) == copy.BUSINESS_RULE
+
+
+def test_every_reason_code_in_the_result_has_a_label(result):
+    for c in result.selection.candidates:
+        for code in c.reason_codes:
+            assert copy.selection_label(code) != code or code in copy.SELECTION_LABELS
+    for e in result.selection.exclusions:
+        for code in e.reason_codes:
+            assert code in copy.EXCLUSION_LABELS, f"no label for exclusion code {code}"
+
+
+# --- 9. exactly five business steps --------------------------------------------------
+
+
+def test_default_summary_has_exactly_five_business_steps():
+    assert len(view.BUSINESS_STEPS) == 5
+    labels = [label for label, _, _ in view.BUSINESS_STEPS]
+    assert labels == [
+        "Diagnose portfolio", "Select candidates", "Analyze selected vehicles",
+        "Build promotion plan", "Consolidate action plan",
+    ]
+
+
+def test_business_steps_map_to_real_trace_step_names(result):
+    trace_names = {t.step_name for t in result.trace}
+    for _, step_name, _ in view.BUSINESS_STEPS:
+        assert step_name in trace_names
+
+
+# --- 10. full trace remains accessible -----------------------------------------------
+
+
+def test_full_trace_is_preserved(result):
+    # The engine's trace is untouched — every step with its ids and timestamps is available.
+    assert len(result.trace) >= 11          # 1 portfolio + 1 select + 7 vehicles + 1 promo + 1 consolidate
+    ok = [t for t in result.trace if t.skill_called and t.status == "OK"]
+    assert all(t.request_id and t.simulation_id for t in ok)
+    assert all(t.start_timestamp and t.end_timestamp for t in result.trace)
+    # The view renders the full trace in an expander, preserving the audit columns.
+    source = (VIEWS / "improve_aging.py").read_text(encoding="utf-8")
+    assert "View full workflow execution trace" in source
+    assert "simulation_id" in source and "request_id" in source
+
+
+# --- 11. assistant summary links to the workspace ------------------------------------
+
+
+def test_assistant_summary_links_to_the_workspace():
+    response = run_assistant(
+        "reduce my inventory utilization to 70% during the Summer Clearance event", as_of=AS_OF)
+    assert response.workflow.value == "IMPROVE_AGING_INVENTORY"
+    assert response.target_url == "improve-aging-inventory"
+    s = response.summary
+    for key in ("current_utilization", "target_utilization", "recommended_plan",
+                "candidate_count", "approvals_required", "target_status"):
+        assert key in s
+
+
+# --- 12. no price publishing introduced ----------------------------------------------
+
+
+@pytest.mark.parametrize("name", ["improve_aging.py", "improve_aging_copy.py"])
+def test_no_price_publishing_introduced(name):
+    source = (VIEWS / name).read_text(encoding="utf-8")
+    for banned in ("publish_vehicle_price", "save_pricing_decision", "write_client", "WriteClient"):
+        assert banned not in source, f"{name} references {banned}"
+
+
+# --- disclosure copy ------------------------------------------------------------------
+
+
+def test_disclosure_states_the_four_safeguards():
+    source = (VIEWS / "improve_aging.py").read_text(encoding="utf-8")
+    lowered = source.lower()
+    assert "synthetic" in lowered or "mocked" in lowered
+    assert "prototype simulation" in lowered
+    assert "review" in lowered
+    assert "no price" in lowered

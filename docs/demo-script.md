@@ -143,7 +143,16 @@ Inventory** workspace.
 > the aging cars worth acting on, priced each one, and built the event plan — in that order,
 > and it shows the order."
 
-Walk the workspace top to bottom:
+**Open on the executive summary — read it out in ten seconds:**
+
+> "Eighty-six percent full, target seventy, four cars to release, seven candidates — and the
+> honest headline: *the target is not achievable*. Then it tells me exactly why: two cars are
+> recently acquired and protected, one's in another campaign, five are at their price floor.
+> And *what would close it* — extend the window, revise the target, or wholesale four units."
+
+Then **"What should I do next?"** — a prioritized list a GM could act on this morning.
+
+Then walk the rest top to bottom:
 
 - **Candidate ranking** — seven aging cars selected, each with *why*: over 90 days, high
   depreciation, duplicate inventory. Five excluded, each with *why not* — and two are
