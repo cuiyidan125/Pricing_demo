@@ -15,6 +15,13 @@ from pricing_agent.agents.assistant import (
 # and views.assistant_home imports `run_assistant` from this package — which must already be
 # bound when that chain runs. Reordering these two lines reintroduces an import cycle.
 from pricing_agent.agents.aging_answer import DirectAnswer, VehicleLine, build_aging_answer
+from pricing_agent.agents.conversation import (
+    ConversationMessage,
+    ConversationState,
+    new_state,
+    resolve_reference,
+)
+from pricing_agent.agents.followup import FollowupResult, handle_followup
 from pricing_agent.agents.extract import INTENTS, extract, intent_of
 from pricing_agent.agents.resolver import MatchResult, MatchStatus, resolve_vehicle
 from pricing_agent.agents.router import ParsedVehicle, RouteResult, parse_vehicle, route

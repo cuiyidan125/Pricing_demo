@@ -159,6 +159,16 @@ require review"); the raw per-condition record count lives under **View approval
 no one reads it as five-plus separate approvals. The workspace remains the place for the full
 evidence, plan comparison, and audit trail.
 
+**Then keep talking to it.** The reply is the start of a thread, not a dead end. Ask
+*"why is the BMW recommended for wholesale?"* — it answers from the existing result (days on lot,
+break-even, the price floor), no re-run. Ask *"show only vehicles over 90 days"* — it filters the
+list in place. Say *"use Summer Clearance"* — it **re-runs the deterministic workflow** with the
+event, shows which vehicles become promotion candidates and the target likelihood, and keeps the
+previous answer until the new one succeeds. Every turn stays in view, and *"open the updated
+workspace"* carries the conversation's context across. If you ask for something the prototype
+doesn't have — shopper views, lead conversion — it says so rather than inventing a number, and it
+never publishes a price.
+
 **Open on the executive summary — read it out in ten seconds:**
 
 > "Eighty-six percent full, target seventy, two cars to release, seven candidates — and an
