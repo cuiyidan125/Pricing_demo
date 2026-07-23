@@ -8,12 +8,16 @@ Every fixture declares its `data_timestamp` **relative to the scenario's injecte
 not to the wall clock (D8). The anchor is:
 
 ```
-as_of = 2026-07-21T14:00:00Z
+as_of = 2026-07-29T14:00:00Z
 ```
 
 Fixtures use absolute timestamps computed from that anchor. A scenario that needs stale data
 (`SV-09`) overrides `as_of` forward rather than editing fixtures, so staleness is deliberate
 and reproducible instead of an artifact of when the suite happens to run.
+
+The whole clock was translated forward from `2026-07-21` to `2026-07-29` when the Summer
+Clearance demo window moved to `2026-08-17`–`08-21`; every fixture `data_timestamp` moved by
+the same +8 days, so freshness relationships are unchanged.
 
 ## Dataset shape
 

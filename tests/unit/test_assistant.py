@@ -26,7 +26,7 @@ from pricing_agent.agents.assistant import (
 from pricing_agent.workflows.context import WorkflowContext
 
 AGENTS = Path(__file__).resolve().parents[2] / "src" / "pricing_agent" / "agents"
-AS_OF = datetime(2026, 7, 21, 14, 0, tzinfo=timezone.utc)
+AS_OF = datetime(2026, 7, 29, 14, 0, tzinfo=timezone.utc)
 
 DEMO_PROMPT = "What should I price 2020 Ford F-150 XLT?"
 
@@ -123,7 +123,7 @@ def test_parse_target_utilization():
 def test_resolve_event_matches_by_name_and_by_holiday_window():
     events = [
         {"event_id": "EVT-SUMMER-2026", "event_name": "Summer Clearance",
-         "start_date": "2026-07-23", "end_date": "2026-07-27"},
+         "start_date": "2026-08-17", "end_date": "2026-08-21"},
         {"event_id": "EVT-LABOR-2026", "event_name": "Labor Day Sales Event",
          "start_date": "2026-09-04", "end_date": "2026-09-07"},
     ]

@@ -16,7 +16,7 @@ SCHEMA_DIR = ROOT / "schemas"
 SCENARIO_DIR = ROOT / "tests" / "scenarios"
 BASE_URI = "https://pricing-demo.local/schemas/"
 
-DEFAULT_AS_OF = datetime(2026, 7, 21, 14, 0, tzinfo=timezone.utc)
+DEFAULT_AS_OF = datetime(2026, 7, 29, 14, 0, tzinfo=timezone.utc)
 
 
 @pytest.fixture(scope="session")

@@ -26,7 +26,7 @@ from pricing_agent.workflows.improve_aging import (
 )
 
 VIEWS = Path(__file__).resolve().parents[2] / "src" / "pricing_agent" / "views"
-AS_OF = datetime(2026, 7, 21, 14, 0, tzinfo=timezone.utc)
+AS_OF = datetime(2026, 7, 29, 14, 0, tzinfo=timezone.utc)
 
 SUMMER = ImproveAgingRequest(
     target_utilization=0.70, event_requested=True, event_id="EVT-SUMMER-2026",
@@ -48,6 +48,17 @@ def no_event():
     return run_improve_aging(MockTransport(as_of=AS_OF), ImproveAgingRequest(target_utilization=0.70))
 
 
+@pytest.fixture(scope="module")
+def not_achievable():
+    """A tighter 60% target that remains unreachable inside the new 2026-08-17 event window,
+    kept as a probe so the TARGET_NOT_ACHIEVABLE copy and gap machinery stay covered. The
+    canonical 70% demo now resolves to AT_RISK (a legitimate result of the forward-looking
+    window); this probe does not change that demo, it only exercises the other state."""
+    return run_improve_aging(MockTransport(as_of=AS_OF), ImproveAgingRequest(
+        target_utilization=0.60, event_requested=True, event_id="EVT-SUMMER-2026",
+        event_name="Summer Clearance", available_events=SUMMER.available_events))
+
+
 # --- 1. executive-summary values come from the result --------------------------------
 
 
@@ -65,19 +76,28 @@ def test_executive_metrics_come_straight_from_the_result(result):
 # --- 2. TARGET_NOT_ACHIEVABLE copy reflects the actual gap ----------------------------
 
 
-def test_target_not_achievable_recommendation_and_gap(result):
-    assert result.state is WorkflowState.TARGET_NOT_ACHIEVABLE
-    statement = copy.recommendation_statement(result)
+def test_canonical_demo_is_at_risk_with_the_new_event_window(result):
+    """The 2026-08-17 Summer Clearance window (19 days after the 2026-07-29 as_of) leaves
+    enough baseline selling time that the 70% target is now AT_RISK rather than not
+    achievable. Selection and plan are unchanged; only the promotion outcome moved."""
+    assert result.state is WorkflowState.ROUTED_AND_EXECUTED
+    assert result.promotion_result["feasibility"]["status"] == "AT_RISK"
+    assert result.portfolio_summary["required_unit_reduction"] == 2
+
+
+def test_target_not_achievable_recommendation_and_gap(not_achievable):
+    assert not_achievable.state is WorkflowState.TARGET_NOT_ACHIEVABLE
+    statement = copy.recommendation_statement(not_achievable)
     assert "not achievable" in statement.lower()
     # The gap the view shows is required minus what the safe plan can release, from the result.
-    required = result.portfolio_summary["required_unit_reduction"]
-    achievable = result.promotion_result["feasibility"]["p50_achievable_incremental_units"]
-    assert required == 4 and achievable == 0.0        # from the fixture, unchanged
-    assert (required - achievable) == 4               # the gap the copy narrates
+    required = not_achievable.portfolio_summary["required_unit_reduction"]
+    achievable = not_achievable.promotion_result["feasibility"]["p50_achievable_incremental_units"]
+    assert required == 3 and achievable == 1.0       # 60% probe at the new window
+    assert (required - achievable) == 2              # the gap the copy narrates
 
 
-def test_gap_reasons_are_only_those_the_result_supports(result):
-    reasons = view._gap_reasons(result)
+def test_gap_reasons_are_only_those_the_result_supports(not_achievable):
+    reasons = view._gap_reasons(not_achievable)
     joined = " ".join(reasons).lower()
     # Present in this result:
     assert "recently-acquired" in joined            # V-10007, V-10010

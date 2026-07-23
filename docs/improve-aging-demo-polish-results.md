@@ -60,12 +60,19 @@ actions → evidence → audit** story.
 | --- | --- | --- |
 | Current utilization | `portfolio_summary.current_utilization` | 86% |
 | Target utilization | `portfolio_summary.target_utilization` | 70% |
-| Units to release | `portfolio_summary.required_unit_reduction` | 4 |
+| Units to release | `portfolio_summary.required_unit_reduction` | 2 |
 | Action candidates | `len(selection.candidates)` | 7 |
-| Target status | `feasibility.status` / `probability_target_achieved` | Not Achievable · 1% likely |
+| Target status | `feasibility.status` / `probability_target_achieved` | At Risk · ~43% likely |
 
-Recommendation statement (derived from state, not hard-coded): *"The requested target is not
-achievable within the current event window and price-floor constraints…"*
+> Values reflect the 2026-08-17 Summer Clearance window. When this polish landed the same
+> scenario read *Not Achievable · 1% likely* with 4 to release; the forward-looking window
+> moved the promotion outcome (the recommendation statement now reads "Recommended approach:
+> Capacity First"). A tighter 60% target still renders the full "not achievable" explanation.
+
+Recommendation statement (derived from state, not hard-coded): for the 70% canonical it now
+reads *"Recommended approach: Capacity First."*; for a not-achievable target it reads *"The
+requested target is not achievable within the current event window and price-floor
+constraints…"*
 
 ## 6. Final recommended-plan presentation
 
@@ -111,8 +118,8 @@ price-publishing tool is referenced; and all Phase 4/5 tests stay green.
 
 | View | Confirmed |
 | --- | --- |
-| Executive summary | 86% → 70%, 4 to release, 7 candidates, Not Achievable · 1% likely; red recommendation banner |
-| Target-not-achievable | needs 4 / can release 0 / gap 4; grounded reasons; "what would close it" |
+| Executive summary | 86% → 70%, 7 candidates; captured before the date move (4 to release, Not Achievable · 1%). At the current 2026-08-17 window it reads 2 to release, At Risk · ~43%, green recommendation banner |
+| Target-not-achievable | renders for a not-achievable target (e.g. a 60% probe: needs 3 / can release 1 / gap 2); grounded reasons; "what would close it" |
 | Recommended plan | Capacity First · Aggressive; ending/util/gross/approvals; savings; held-back note |
 | Vehicles requiring action | friendly "Why" labels; raw codes + sim ids in expander |
 | Vehicles protected/excluded | friendly labels + rule type (Business rule / Data limitation) |

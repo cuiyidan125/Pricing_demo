@@ -5,8 +5,8 @@
       {
         "event_id": "EVT-SUMMER-2026",
         "event_name": "Summer Clearance",
-        "start_date": "2026-07-23",
-        "end_date": "2026-07-27",
+        "start_date": "2026-08-17",
+        "end_date": "2026-08-21",
         "event_type": "SEASONAL_CLEARANCE",
         "eligible_inventory_filter": { "status": ["ACTIVE"], "min_days_in_inventory": 21 },
         "promotion_budget": 12000,
@@ -15,7 +15,7 @@
         "historical_demand_lift": 1.42,
         "lift_confidence": "MEDIUM",
         "lift_basis": 3,
-        "_note": "Starts two days after as_of, matching the §15.2 example. Validated lift from 3 prior comparable events."
+        "_note": "Five-day window starting 2026-08-17, nineteen days after the injected as_of (2026-07-29), so the demo reads as forward-looking. Validated lift from 3 prior comparable events."
       },
       {
         "event_id": "EVT-LABOR-2026",
@@ -36,7 +36,7 @@
   },
   "meta": {
     "source": "INTERNAL_EVENT",
-    "data_timestamp": "2026-07-21T05:30:00Z",
+    "data_timestamp": "2026-07-29T05:30:00Z",
     "source_version": "event-mcp-mock-0.1.0",
     "confidence": "MEDIUM",
     "coverage": 1.0,

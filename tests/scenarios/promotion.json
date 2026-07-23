@@ -1,7 +1,7 @@
 {
   "suite": "promotion",
   "spec_ref": "product-spec.md §26.3",
-  "default_as_of": "2026-07-21T14:00:00Z",
+  "default_as_of": "2026-07-29T14:00:00Z",
   "baseline_target_math": {
     "note": "Worked once here so every scenario below can reference it. Implements D6.",
     "total_physical_slots": 14,
@@ -196,8 +196,8 @@
       "expect": {
         "warnings_must_include": ["VEHICLE_EXPECTED_TO_SELL_BEFORE_EVENT"],
         "assertions": [
-          "the Labor Day event starts 45 days after as_of, so vehicles with P50 days to sale under 45 are excluded",
-          "V-10001 and V-10007 are expected to be excluded on this rule",
+          "the Labor Day event starts 37 days after as_of (2026-09-04 minus 2026-07-29), so vehicles with P50 days to sale under 37 are excluded",
+          "the freshest, fastest-selling units are expected to be excluded on this rule",
           "discounting a vehicle that would have sold at full price is a pure gross giveaway -- the most common way an event destroys margin",
           "the threshold is this design's choice, not a specification requirement"
         ]

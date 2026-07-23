@@ -29,7 +29,7 @@ from pricing_agent.agents.assistant import AssistantResponse, AssistantState
 from pricing_agent.workflows.context import WorkflowContext
 from pricing_agent.workflows.pages import page_for
 
-AS_OF = datetime(2026, 7, 21, 14, 0, tzinfo=timezone.utc)
+AS_OF = datetime(2026, 7, 29, 14, 0, tzinfo=timezone.utc)
 
 # Stable, non-widget session keys. Streamlit garbage-collects the state of any widget that
 # is not rendered on a run, so the request and its result are held under plain keys that

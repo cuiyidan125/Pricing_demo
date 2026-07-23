@@ -30,7 +30,7 @@ from pricing_agent.workflows.improve_aging import (
     run_improve_aging,
 )
 
-AS_OF = datetime(2026, 7, 21, 14, 0, tzinfo=timezone.utc)
+AS_OF = datetime(2026, 7, 29, 14, 0, tzinfo=timezone.utc)
 
 DEMO_REQUEST = ImproveAgingRequest(
     target_utilization=0.70,

@@ -12,6 +12,11 @@ Run of the Summer Clearance scenario (`as_of=2026-07-21`, `EVT-SUMMER-2026`, tar
 returns state **TARGET_NOT_ACHIEVABLE** with all of the following already present. Nothing new
 needs to be computed.
 
+> Historical snapshot from the Phase 5.1 inspection. The scenario dates were later moved
+> forward (`as_of=2026-07-29`, event `2026-08-17`–`08-21`); at that window the same 70% target
+> reads **AT_RISK · ~43%** with 2 units to release. The field *inventory* below is unchanged —
+> only the values differ. See `docs/improve-aging-orchestration-results.md` §7.
+
 ### Executive summary (all from `portfolio_summary` / `selection` / `promotion_result`)
 | Metric | Field | Value now |
 | --- | --- | --- |

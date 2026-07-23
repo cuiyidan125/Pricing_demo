@@ -1,7 +1,7 @@
 {
   "suite": "single-vehicle",
   "spec_ref": "product-spec.md §26.1",
-  "default_as_of": "2026-07-21T14:00:00Z",
+  "default_as_of": "2026-07-29T14:00:00Z",
   "notes": "Each scenario names the fixture state it depends on and the observable outcome. 'mutations' are applied to the mock data before the run, so a scenario never depends on editing a shared fixture in place.",
 
   "scenarios": [
@@ -130,7 +130,7 @@
       "id": "SV-09",
       "name": "Stale vAuto data",
       "vehicle_id": "V-10010",
-      "as_of_override": "2026-07-23T14:00:00Z",
+      "as_of_override": "2026-07-31T14:00:00Z",
       "mutations": [],
       "expect": {
         "warnings_must_include": ["STALE_MARKET_DATA"],

@@ -26,7 +26,7 @@ from pricing_agent.workflows.improve_aging import (
 
 REPO = Path(__file__).resolve().parents[2]
 WORKFLOWS = REPO / "src" / "pricing_agent" / "workflows"
-AS_OF = datetime(2026, 7, 21, 14, 0, tzinfo=timezone.utc)
+AS_OF = datetime(2026, 7, 29, 14, 0, tzinfo=timezone.utc)
 
 SUMMER = dict(
     target_utilization=0.70, event_requested=True, event_id="EVT-SUMMER-2026",
@@ -247,7 +247,9 @@ def test_named_but_unresolvable_event_needs_clarification():
 
 
 def test_unrealistic_target_returns_target_not_achievable():
-    result = run(**SUMMER)   # 70% on this lot is not reachable with safe actions
+    # With the forward-looking 2026-08-17 window the canonical 70% target is now AT_RISK, so a
+    # tighter 60% target is used to exercise the not-achievable state. Selection is identical.
+    result = run(**{**SUMMER, "target_utilization": 0.60})
     assert result.state is WorkflowState.TARGET_NOT_ACHIEVABLE
     assert result.promotion_result["feasibility"]["status"] == "NOT_ACHIEVABLE"
     # Full evidence is still present.

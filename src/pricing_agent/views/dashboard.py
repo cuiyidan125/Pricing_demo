@@ -24,7 +24,7 @@ from pricing_agent.workflows.context import WorkflowContext
 
 import ui_components
 
-AS_OF = datetime(2026, 7, 21, 14, 0, tzinfo=timezone.utc)
+AS_OF = datetime(2026, 7, 29, 14, 0, tzinfo=timezone.utc)
 
 
 def md(text: str) -> str:

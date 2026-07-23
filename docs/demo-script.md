@@ -111,25 +111,28 @@ calculator.
 
 ## Beat 4 — Work the whole lot (75s)
 
-Sidebar → **Merchandise Inventory**. Event: **Summer Clearance**. Target: **70%**.
+Sidebar → **Merchandise Inventory**. Event: **Summer Clearance** (2026-08-17 → 08-21).
+Target: **70%**.
 
-> "I want the lot at seventy percent by the end of a five-day event."
+> "I want the lot at seventy percent by the end of the August event."
 
-Verdict first: **Not Achievable**.
+Verdict first: **At Risk** — it hits the target about **43%** of the time.
 
-> "It needs four incremental sales in five days. The most aggressive safe plan gets about
-> half a car. It's telling me no — and then telling me what would work."
+> "It needs two incremental sales, and the most aggressive safe plan gets there just under
+> half the time. It's not a no, but it's a coin-flip — and it tells me exactly how to
+> improve the odds."
 
-Show the quantified alternatives: extend the campaign, revise the target, or wholesale
-four units.
+Show the quantified alternatives: extend the campaign, revise the target, or wholesale a
+couple of units.
 
 Then the **Excluded** tab — this is the sharpest observation in the demo:
 
-> "Four cars are excluded for `NO_SAFE_HEADROOM`, and they're the aged ones. The cars I
+> "Several cars are excluded for `NO_SAFE_HEADROOM`, and they're the aged ones. The cars I
 > most want to move are exactly the ones I can't legally discount, because they're
 > already at or below their floor. That tension is real, and most tools hide it."
 
-Drag the target to **85%** to show the verdict change.
+Drag the target to **85%** to flip the verdict to **Not Achievable** and watch the quantified
+alternatives appear — the strongest honesty moment in the demo.
 
 ---
 
@@ -145,12 +148,18 @@ Inventory** workspace.
 
 **Open on the executive summary — read it out in ten seconds:**
 
-> "Eighty-six percent full, target seventy, four cars to release, seven candidates — and the
-> honest headline: *the target is not achievable*. Then it tells me exactly why: two cars are
-> recently acquired and protected, one's in another campaign, five are at their price floor.
-> And *what would close it* — extend the window, revise the target, or wholesale four units."
+> "Eighty-six percent full, target seventy, two cars to release, seven candidates — and an
+> honest headline: the target is *at risk*, about forty-three percent likely. The recommended
+> plan is Capacity First, and every number traces to a simulation, not a guess."
 
-Then **"What should I do next?"** — a prioritized list a GM could act on this morning.
+Then **"What should I do next?"** — a prioritized list a GM could act on this morning:
+review the two manager-approval cars, run a loss-minimization review on the three deep-aged
+units, approve the promotion for the two with safe headroom, and hold price on the protected
+three.
+
+> "If I tighten the target — say to sixty percent — the same workspace flips to *not
+> achievable* and shows the gap and exactly what would close it: extend the window, revise
+> the target, or wholesale a couple of units."
 
 Then walk the rest top to bottom:
 

@@ -26,7 +26,7 @@ from pricing_agent.workflows.context import WorkflowContext
 
 import ui_components
 
-AS_OF = datetime(2026, 7, 21, 14, 0, tzinfo=timezone.utc)
+AS_OF = datetime(2026, 7, 29, 14, 0, tzinfo=timezone.utc)
 
 SEVERITY_STYLE = {
     "BLOCKING": ("🚫", "error"),
