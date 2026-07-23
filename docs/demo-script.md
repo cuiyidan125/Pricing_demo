@@ -151,6 +151,14 @@ Inventory** workspace.
 > the aging cars worth acting on, priced each one, and built the event plan — in that order,
 > and it shows the order."
 
+**The assistant answers in the conversation first.** Before you ever open the workspace, the
+reply names the actual vehicles — which need immediate action, with a one-line reason each, and
+which are only sale-event candidates — and states plainly when no event is selected that
+"promotion eligibility is not finalized." Review is shown as a **vehicle count** ("5 vehicles
+require review"); the raw per-condition record count lives under **View approval details**, so
+no one reads it as five-plus separate approvals. The workspace remains the place for the full
+evidence, plan comparison, and audit trail.
+
 **Open on the executive summary — read it out in ten seconds:**
 
 > "Eighty-six percent full, target seventy, two cars to release, seven candidates — and an

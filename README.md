@@ -93,10 +93,13 @@ Dealer Workflows
 ### The assistant routes and executes — deterministically
 
 Ask a question in plain words and the assistant classifies it, resolves the named vehicle
-against real inventory, runs **one** skill, and shows a concise result with a link into the
-full workspace. **No model is involved** — routing, entity extraction, and vehicle
-resolution are rules over strings (`src/pricing_agent/agents/`), and every number shown is
-copied from the skill result, never generated.
+against real inventory, runs the right skill(s), and answers **in the conversation** — for an
+aging request it names the actual vehicles, their recommended actions, and a one-line reason
+each, before linking into the full workspace. **No model is involved** — routing, entity
+extraction, resolution, and the grounded answer are rules over strings
+(`src/pricing_agent/agents/`), and every number shown is copied from the skill result, never
+generated. Review requirements are surfaced as a **vehicle count**, with the raw per-condition
+records kept in a "View approval details" audit section.
 
 ```
 "What should I price 2020 Ford F-150 XLT?"   → resolves V-10003 → single-vehicle valuation → result
