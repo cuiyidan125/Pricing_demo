@@ -236,7 +236,7 @@ def aging_timeline(
             base=0,
             orientation="h",
             name="Time on lot",
-            marker=dict(color="rgba(100,116,139,0.85)"),
+            marker=dict(color="rgba(122,111,101,0.85)"),  # warm neutral: the past/context
             hovertemplate="On the lot %{x:.0f} days<extra></extra>",
         )
     )
@@ -247,7 +247,7 @@ def aging_timeline(
             base=days_in_inventory,
             orientation="h",
             name="Expected time to sale (P50)",
-            marker=dict(color="rgba(59,130,246,0.75)"),
+            marker=dict(color="rgba(238,90,42,0.9)"),  # vAuto orange: the P50 projection
             error_x=dict(
                 type="data",
                 symmetric=False,
@@ -263,7 +263,7 @@ def aging_timeline(
         figure.add_vline(
             x=threshold,
             line_dash="dot",
-            line_color="rgba(220,38,38,0.65)",
+            line_color="rgba(178,44,20,0.7)",  # warm brick: the 90/120-day danger line
             annotation_text=f"{threshold}d",
             annotation_position="top",
         )
